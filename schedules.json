@@ -1,0 +1,11 @@
+[
+  {
+    "name": "Nightly regression",
+    "cronExpression": "0 9 * * *",
+    "mode": "test",
+    "enabled": true,
+    "id": "959cafe7-de59-426e-b0fc-74cef40c4aa4",
+    "createdAt": 1782037533341,
+    "lastRun": null
+  }
+]

@@ -1,0 +1,33 @@
+{
+  "name": "visual-qa-agent",
+  "version": "1.0.0",
+  "description": "Visual Regression Testing Agent",
+  "scripts": {
+    "baseline": "tsx src/agent.ts --mode=baseline",
+    "test": "tsx src/agent.ts --mode=test",
+    "server": "tsx src/server.ts",
+    "dev:server": "tsx watch src/server.ts",
+    "dev:client": "npm run dev --prefix client",
+    "dev": "concurrently -n server,client -c cyan,magenta \"npm run dev:server\" \"npm run dev:client\"",
+    "build:client": "npm run build --prefix client"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "node-cron": "^4.4.1",
+    "pixelmatch": "^5.3.0",
+    "playwright": "^1.44.0",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.0.0",
+    "@types/node-cron": "^3.0.11",
+    "@types/pixelmatch": "^5.2.6",
+    "@types/pngjs": "^6.0.4",
+    "concurrently": "^9.2.3",
+    "tsx": "^4.11.0",
+    "typescript": "^5.4.0"
+  }
+}
