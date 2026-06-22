@@ -6,7 +6,10 @@ export interface ViewportConfig {
 }
 
 export async function launchBrowser(): Promise<Browser> {
-  return await chromium.launch({ headless: true });
+  return await chromium.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
 }
 
 export async function openPage(
