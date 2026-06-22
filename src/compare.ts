@@ -76,7 +76,7 @@ export async function compareScreenshots(
   );
 
   const diffPercent = (diffPixels / pixels) * 100;
-  const passed = diffPercent <= threshold;
+  const passed = diffPercent <= (threshold * 100);
 
   // שמור תמונת diff רק אם יש הבדל
   if (diffPixels > 0) {
