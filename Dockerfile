@@ -10,7 +10,7 @@ RUN npm ci --include=dev --prefix client
 
 COPY . .
 
-RUN cd client && npx vite build
+RUN npm run build:client
 
 EXPOSE 10000
 
