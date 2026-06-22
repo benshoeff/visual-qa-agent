@@ -1,7 +1,7 @@
 services:
   - type: web
     name: visual-qa-agent
-    runtime: image
+    runtime: docker
     dockerfilePath: ./Dockerfile
     envVars:
       - key: NODE_ENV
