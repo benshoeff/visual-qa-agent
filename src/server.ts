@@ -9,6 +9,13 @@ import { initScheduler } from "./scheduler.js";
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3456;
 
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("UNHANDLED REJECTION:", reason);
+});
+
 app.use(cors());
 app.use(express.json());
 
@@ -21,7 +28,7 @@ app.use("/api", router);
 const clientDist = path.join(process.cwd(), "client", "dist");
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  app.get("/{*path}", (_req, res) => {
+  app.get("*", (_req, res) => {
     res.sendFile(path.join(clientDist, "index.html"));
   });
 }
