@@ -9,8 +9,7 @@
     "dev:server": "tsx watch src/server.ts",
     "dev:client": "npm run dev --prefix client",
     "dev": "concurrently -n server,client -c cyan,magenta \"npm run dev:server\" \"npm run dev:client\"",
-    "build:client": "npm run build --prefix client",
-    "postinstall": "playwright install chromium"
+    "build:client": "npm run build --prefix client"
   },
   "dependencies": {
     "cors": "^2.8.6",
