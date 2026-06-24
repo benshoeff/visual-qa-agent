@@ -174,6 +174,21 @@ router.post("/run/test", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/run/scheduled", async (_req: Request, res: Response) => {
+  try {
+    console.log("\n⏰ Running scheduled job (Render Cron)");
+    const config = readConfig();
+    const results = await runTest(config);
+    const passed = results.filter((r) => r.passed).length;
+    const failed = results.filter((r) => !r.passed).length;
+    console.log(`   📊 Scheduled run: ${passed} passed, ${failed} failed`);
+    res.json({ results, summary: { passed, failed } });
+  } catch (err) {
+    console.error("   ❌ Scheduled run failed:", (err as Error).message);
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 // ─── Reports ─────────────────────────────────────────────────────────────
 
 router.get("/reports", (_req: Request, res: Response) => {

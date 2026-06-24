@@ -86,6 +86,14 @@ export function deleteSchedule(id: string): boolean {
 
 const jobs = new Map<string, ScheduledTask>();
 
+export function updateLastRun(id: string): void {
+  const schedules = readSchedules();
+  const idx = schedules.findIndex((s) => s.id === id);
+  if (idx === -1) return;
+  schedules[idx].lastRun = Date.now();
+  writeSchedules(schedules);
+}
+
 function startScheduleJob(schedule: Schedule) {
   if (!cron.validate(schedule.cronExpression)) {
     console.error(`Invalid cron expression for "${schedule.name}": ${schedule.cronExpression}`);
@@ -104,7 +112,7 @@ function startScheduleJob(schedule: Schedule) {
         const failed = results.filter((r) => !r.passed).length;
         console.log(`   📊 ${schedule.name}: ${passed} passed, ${failed} failed`);
       }
-      updateSchedule(schedule.id, { lastRun: Date.now() });
+      updateLastRun(schedule.id);
     } catch (err) {
       console.error(`   ❌ ${schedule.name} failed:`, (err as Error).message);
     }
