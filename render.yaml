@@ -17,5 +17,3 @@ services:
     envVars:
       - key: WEB_SERVICE_URL
         value: https://visual-qa-agent.onrender.com
-    startCommand: >
-      sh -c "curl -s -S -o /dev/null -w '%{http_code}' -X POST $WEB_SERVICE_URL/api/run/scheduled"
