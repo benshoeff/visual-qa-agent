@@ -5,8 +5,6 @@ import type { PageConfig, CompareResult } from '../api'
 const emptyPage = (): PageConfig => ({
   name: '',
   url: '',
-  waitForSelector: 'body',
-  mask: [],
 })
 
 export default function PagesManager() {
@@ -134,27 +132,6 @@ export default function PagesManager() {
               />
             </label>
             <label>
-              Wait For Selector
-              <input
-                value={editing.waitForSelector ?? ''}
-                onChange={(e) => setEditing({ ...editing, waitForSelector: e.target.value || undefined })}
-                placeholder="body"
-              />
-            </label>
-            <label>
-              Mask Selectors (comma separated)
-              <input
-                value={(editing.mask ?? []).join(', ')}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    mask: e.target.value ? e.target.value.split(',').map((s) => s.trim()).filter(Boolean) : [],
-                  })
-                }
-                placeholder=".ad, .live-clock"
-              />
-            </label>
-            <label>
               Threshold % (optional — overrides global)
               <input
                 type="number"
@@ -190,8 +167,6 @@ export default function PagesManager() {
             <th>Preview</th>
             <th>Name</th>
             <th>URL</th>
-            <th>Wait For</th>
-            <th>Mask</th>
             <th>Threshold</th>
             <th>Actions</th>
           </tr>
@@ -199,7 +174,7 @@ export default function PagesManager() {
         <tbody>
           {pages.length === 0 && (
             <tr>
-                <td colSpan={7} className="empty">
+                <td colSpan={5} className="empty">
                 No pages configured yet. Click "Add Page" to get started.
               </td>
             </tr>
@@ -246,8 +221,6 @@ export default function PagesManager() {
                     </a>
                   </span>
                 </td>
-                <td>{p.waitForSelector || '—'}</td>
-                <td>{(p.mask ?? []).length > 0 ? p.mask!.join(', ') : '—'}</td>
                 <td>{p.threshold != null ? `${p.threshold}%` : '—'}</td>
                 <td className="actions-cell">
                   <div className="actions-flex">
