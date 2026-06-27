@@ -4,20 +4,15 @@
     "height": 720
   },
   "threshold": 0.2,
-  "waitFor": "networkidle",
   "pages": [
     {
       "name": "Homepage",
       "url": "https://qa-sandbox-app.vercel.app/",
-      "waitForSelector": "body",
-      "mask": [],
       "threshold": 1
     },
     {
       "name": "Users",
-      "url": "https://qa-sandbox-app.vercel.app/users",
-      "waitForSelector": "h1",
-      "mask": []
+      "url": "https://qa-sandbox-app.vercel.app/users"
     }
   ]
 }

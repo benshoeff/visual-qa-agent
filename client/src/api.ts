@@ -15,15 +15,12 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 export interface PageConfig {
   name: string
   url: string
-  waitForSelector?: string
-  mask?: string[]
   threshold?: number
 }
 
 export interface Config {
   viewport: { width: number; height: number }
   threshold: number
-  waitFor: 'networkidle' | 'domcontentloaded' | 'load'
   pages: PageConfig[]
 }
 
