@@ -1,5 +1,6 @@
 {
-  "buildCommand": "npm run build:client",
+  "installCommand": "npm install --prefix client",
+  "buildCommand": "cd client && npm run build",
   "outputDirectory": "client/dist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "https://visual-qa-agent.onrender.com/api/$1" },
