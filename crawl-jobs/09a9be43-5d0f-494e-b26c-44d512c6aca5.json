@@ -1,0 +1,49 @@
+{
+  "id": "09a9be43-5d0f-494e-b26c-44d512c6aca5",
+  "status": "completed",
+  "startUrl": "https://example.com",
+  "config": {
+    "maxPages": 50,
+    "maxDepth": 3,
+    "sameDomainOnly": true,
+    "excludePatterns": [
+      "/login",
+      "/signup",
+      "/signin",
+      "/admin",
+      "/api",
+      "/auth",
+      "/cart",
+      "/checkout",
+      "/account",
+      "/password",
+      "/reset",
+      "/verify",
+      "/logout",
+      "/oauth",
+      "/callback",
+      "/webhook",
+      "/.well-known"
+    ],
+    "waitFor": "networkidle",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "progress": {
+    "current": 1,
+    "total": 1,
+    "currentUrl": ""
+  },
+  "discoveredPages": [
+    {
+      "url": "https://example.com",
+      "name": "homepage",
+      "depth": 0
+    }
+  ],
+  "results": [],
+  "createdAt": "2026-07-11T08:43:24.926Z",
+  "updatedAt": "2026-07-11T08:43:26.480Z"
+}

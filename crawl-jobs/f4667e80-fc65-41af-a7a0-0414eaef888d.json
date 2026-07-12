@@ -1,0 +1,56 @@
+{
+  "id": "f4667e80-fc65-41af-a7a0-0414eaef888d",
+  "status": "completed",
+  "startUrl": "https://example.com",
+  "config": {
+    "maxPages": 50,
+    "maxDepth": 3,
+    "sameDomainOnly": true,
+    "excludePatterns": [
+      "/login",
+      "/signup",
+      "/signin",
+      "/admin",
+      "/api",
+      "/auth",
+      "/cart",
+      "/checkout",
+      "/account",
+      "/password",
+      "/reset",
+      "/verify",
+      "/logout",
+      "/oauth",
+      "/callback",
+      "/webhook",
+      "/.well-known"
+    ],
+    "waitFor": "networkidle",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "progress": {
+    "current": 1,
+    "total": 1,
+    "currentUrl": "https://example.com"
+  },
+  "discoveredPages": [
+    {
+      "url": "https://example.com",
+      "name": "homepage",
+      "depth": 0
+    }
+  ],
+  "results": [
+    {
+      "pageName": "homepage",
+      "url": "https://example.com",
+      "success": true,
+      "baselinePath": "/Users/benshoeff/Desktop/visual-qa-agent/visual-qa-agent/baselines/homepage.png"
+    }
+  ],
+  "createdAt": "2026-07-11T08:43:37.924Z",
+  "updatedAt": "2026-07-11T08:43:40.829Z"
+}

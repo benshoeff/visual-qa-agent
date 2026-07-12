@@ -1,0 +1,153 @@
+{
+  "id": "7f998a91-81fd-4642-9a69-81a83c21aa22",
+  "status": "completed",
+  "startUrl": "https://qa-sandbox-app.vercel.app/",
+  "config": {
+    "maxPages": 50,
+    "maxDepth": 3,
+    "sameDomainOnly": true,
+    "excludePatterns": [
+      "/login",
+      "/signup",
+      "/signin",
+      "/admin",
+      "/api",
+      "/auth",
+      "/cart",
+      "/checkout",
+      "/account",
+      "/password",
+      "/reset",
+      "/verify",
+      "/logout",
+      "/oauth",
+      "/callback",
+      "/webhook",
+      "/.well-known"
+    ],
+    "waitFor": "networkidle",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "progress": {
+    "current": 9,
+    "total": 9,
+    "currentUrl": "https://qa-sandbox-app.vercel.app/orders"
+  },
+  "discoveredPages": [
+    {
+      "url": "https://qa-sandbox-app.vercel.app/",
+      "name": "homepage",
+      "depth": 0
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/users",
+      "name": "users",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/roles",
+      "name": "roles",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/permissions",
+      "name": "permissions",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/products",
+      "name": "products",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/categories",
+      "name": "categories",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/posts",
+      "name": "posts",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/tasks",
+      "name": "tasks",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/orders",
+      "name": "orders",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    }
+  ],
+  "results": [
+    {
+      "pageName": "homepage",
+      "url": "https://qa-sandbox-app.vercel.app/",
+      "success": true,
+      "baselinePath": "/Users/benshoeff/Desktop/visual-qa-agent/visual-qa-agent/baselines/homepage.png",
+      "error": "Already exists in config"
+    },
+    {
+      "pageName": "users",
+      "url": "https://qa-sandbox-app.vercel.app/users",
+      "success": true,
+      "baselinePath": "/Users/benshoeff/Desktop/visual-qa-agent/visual-qa-agent/baselines/users.png"
+    },
+    {
+      "pageName": "roles",
+      "url": "https://qa-sandbox-app.vercel.app/roles",
+      "success": true,
+      "baselinePath": "/Users/benshoeff/Desktop/visual-qa-agent/visual-qa-agent/baselines/roles.png"
+    },
+    {
+      "pageName": "permissions",
+      "url": "https://qa-sandbox-app.vercel.app/permissions",
+      "success": true,
+      "baselinePath": "/Users/benshoeff/Desktop/visual-qa-agent/visual-qa-agent/baselines/permissions.png"
+    },
+    {
+      "pageName": "products",
+      "url": "https://qa-sandbox-app.vercel.app/products",
+      "success": true,
+      "baselinePath": "/Users/benshoeff/Desktop/visual-qa-agent/visual-qa-agent/baselines/products.png"
+    },
+    {
+      "pageName": "categories",
+      "url": "https://qa-sandbox-app.vercel.app/categories",
+      "success": true,
+      "baselinePath": "/Users/benshoeff/Desktop/visual-qa-agent/visual-qa-agent/baselines/categories.png"
+    },
+    {
+      "pageName": "posts",
+      "url": "https://qa-sandbox-app.vercel.app/posts",
+      "success": true,
+      "baselinePath": "/Users/benshoeff/Desktop/visual-qa-agent/visual-qa-agent/baselines/posts.png"
+    },
+    {
+      "pageName": "tasks",
+      "url": "https://qa-sandbox-app.vercel.app/tasks",
+      "success": true,
+      "baselinePath": "/Users/benshoeff/Desktop/visual-qa-agent/visual-qa-agent/baselines/tasks.png"
+    },
+    {
+      "pageName": "orders",
+      "url": "https://qa-sandbox-app.vercel.app/orders",
+      "success": true,
+      "baselinePath": "/Users/benshoeff/Desktop/visual-qa-agent/visual-qa-agent/baselines/orders.png"
+    }
+  ],
+  "createdAt": "2026-07-11T08:46:13.810Z",
+  "updatedAt": "2026-07-11T08:46:44.736Z"
+}

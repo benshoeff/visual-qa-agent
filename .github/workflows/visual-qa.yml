@@ -1,0 +1,301 @@
+name: Visual Regression Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Test mode'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - test
+          - baseline
+      pages:
+        description: 'Specific pages to test (comma-separated, or "all")'
+        required: false
+        default: 'all'
+        type: string
+
+env:
+  NODE_VERSION: '20'
+  OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
+  OLLAMA_MODEL: ${{ secrets.OLLAMA_MODEL || 'llama3.2-vision:11b' }}
+  AI_ENABLED: ${{ secrets.AI_ENABLED || 'true' }}
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+jobs:
+  visual-regression:
+    name: Visual Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for git diff analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Setup Ollama (if AI enabled)
+        if: env.AI_ENABLED == 'true'
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama serve &
+          sleep 5
+          ollama pull ${{ env.OLLAMA_MODEL }}
+
+      - name: Setup PostgreSQL (if DATABASE_URL provided)
+        if: env.DATABASE_URL != ''
+        run: |
+          docker run -d \
+            --name postgres \
+            -e POSTGRES_DB=visualqa \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -p 5432:5432 \
+            postgres:16-alpine
+          sleep 5
+          npm run db:migrate
+
+      - name: Determine test mode
+        id: test-mode
+        run: |
+          if [ "${{ github.event.inputs.mode }}" != "" ]; then
+            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "mode=test" >> $GITHUB_OUTPUT
+          else
+            echo "mode=test" >> $GITHUB_OUTPUT
+          fi
+          
+          if [ "${{ github.event.inputs.pages }}" != "" ] && [ "${{ github.event.inputs.pages }}" != "all" ]; then
+            echo "pages=${{ github.event.inputs.pages }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Baseline Capture
+        if: steps.test-mode.outputs.mode == 'baseline'
+        run: |
+          npm run baseline
+
+      - name: Run Visual Regression Tests
+        if: steps.test-mode.outputs.mode == 'test'
+        id: test-run
+        run: |
+          if [ "${{ steps.test-mode.outputs.pages }}" != "" ]; then
+            PAGES="${{ steps.test-mode.outputs.pages }}" npm run test
+          else
+            npm run test
+          fi
+
+      - name: Upload Test Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-qa-artifacts
+          path: |
+            baselines/
+            current/
+            diffs/
+            reports/
+          retention-days: 30
+
+      - name: Generate PR Comment
+        if: github.event_name == 'pull_request' && steps.test-mode.outputs.mode == 'test'
+        id: pr-comment
+        run: |
+          REPORT_FILE=$(ls -t reports/report-*.html | head -1)
+          if [ -f "$REPORT_FILE" ]; then
+            PASSED=$(grep -o '✅ Pass' "$REPORT_FILE" | wc -l)
+            FAILED=$(grep -o '❌ Fail' "$REPORT_FILE" | wc -l)
+            TOTAL=$((PASSED + FAILED))
+            
+            cat > pr-comment.md << EOF
+            ## 🔍 Visual QA Report
+            
+            **Run ID:** ${{ github.run_id }}
+            **Mode:** Test
+            **Pages Tested:** $TOTAL
+            **Passed:** $PASSED ✅
+            **Failed:** $FAILED $([ $FAILED -gt 0 ] && echo '❌' || echo '✅')
+            
+            ### Details
+            | Page | Status | Diff % | AI Classification |
+            |------|--------|--------|-------------------|
+            EOF
+            
+            # Extract table rows from report
+            grep -A 1000 '<tbody>' "$REPORT_FILE" | grep -E '(pass-row|fail-row)' | head -20 | while IFS= read -r line; do
+              PAGE=$(echo "$line" | sed -n 's/.*<strong>\([^<]*\)<\/strong>.*/\1/p')
+              STATUS=$(echo "$line" | sed -n 's/.*class="\(pass\|fail\)".*/\1/p')
+              DIFF=$(echo "$line" | sed -n 's/.*<td>\([^<]*\)%<\/td>.*/\1/p' | head -1)
+              AI_CLASS=$(echo "$line" | sed -n 's/.*class="ai-badge"[^>]*>\([^<]*\)<\/span>.*/\1/p')
+              echo "| $PAGE | $STATUS | $DIFF% | $AI_CLASS |" >> pr-comment.md
+            done
+            
+            echo "" >> pr-comment.md
+            echo "> View full report: [Download Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> pr-comment.md
+          else
+            echo "No report found" > pr-comment.md
+          fi
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.test-mode.outputs.mode == 'test'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const comment = fs.readFileSync('pr-comment.md', 'utf8');
+            
+            // Find existing comment
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number
+            });
+            
+            const existingComment = comments.data.find(c => c.body.includes('Visual QA Report'));
+            
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: comment
+              });
+            }
+
+      - name: Add GitHub Annotations
+        if: github.event_name == 'pull_request' && steps.test-mode.outputs.mode == 'test'
+        run: |
+          REPORT_FILE=$(ls -t reports/report-*.html | head -1)
+          if [ -f "$REPORT_FILE" ]; then
+            # Parse failures and add annotations
+            grep -E 'class="fail-row"' "$REPORT_FILE" | while IFS= read -r line; do
+              PAGE=$(echo "$line" | sed -n 's/.*<strong>\([^<]*\)<\/strong>.*/\1/p')
+              DIFF=$(echo "$line" | sed -n 's/.*<td>\([^<]*\)%<\/td>.*/\1/p' | head -1)
+              echo "::error title=Visual Regression Failed::$PAGE has $DIFF% visual difference"
+            done
+          fi
+
+      - name: Fail on Regression
+        if: steps.test-mode.outputs.mode == 'test'
+        run: |
+          REPORT_FILE=$(ls -t reports/report-*.html | head -1)
+          if [ -f "$REPORT_FILE" ]; then
+            FAILED=$(grep -c 'class="fail-row"' "$REPORT_FILE" || true)
+            if [ "$FAILED" -gt 0 ]; then
+              echo "::error::Visual regression detected on $FAILED page(s)"
+              exit 1
+            fi
+          fi
+
+  # Separate job for test impact analysis
+  impact-analysis:
+    name: Test Impact Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: visual-regression
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Analyze Impact
+        id: impact
+        run: |
+          # Get changed files
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+          
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Simple heuristic: if CSS/JS/components changed, suggest affected pages
+          AFFECTED_PAGES=""
+          if echo "$CHANGED_FILES" | grep -qE '\.(css|scss|sass|less)$'; then
+            AFFECTED_PAGES="all (CSS changes)"
+          elif echo "$CHANGED_FILES" | grep -qE '(components|pages|views)/.*\.(tsx|jsx|vue|svelte)$'; then
+            AFFECTED_PAGES="all (component changes)"
+          elif echo "$CHANGED_FILES" | grep -qE '\.(js|ts)$'; then
+            AFFECTED_PAGES="all (JS/TS changes)"
+          else
+            AFFECTED_PAGES="unknown"
+          fi
+          
+          echo "affected_pages=$AFFECTED_PAGES" >> $GITHUB_OUTPUT
+
+      - name: Post Impact Analysis
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = `## 🎯 Test Impact Analysis
+            
+            **Changed Files:**
+            \`\`\`
+            ${process.env.CHANGED_FILES || 'None'}
+            \`\`\`
+            
+            **Recommended Pages to Test:** ${process.env.AFFECTED_PAGES || 'All'}
+            
+            _Run \`visual-qa test\` with specific pages to target affected areas._`;
+            
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number
+            });
+            
+            const existing = comments.data.find(c => c.body.includes('Test Impact Analysis'));
+            
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: comment
+              });
+            }
+        env:
+          CHANGED_FILES: ${{ steps.impact.outputs.changed_files }}
+          AFFECTED_PAGES: ${{ steps.impact.outputs.affected_pages }}

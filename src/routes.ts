@@ -15,8 +15,23 @@ import {
   deleteSchedule,
   previewNextRun,
 } from "./scheduler.js";
+import { testCasesRouter } from "./routes/testCases.js";
+import { flakyTestsRouter } from "./routes/flakyTests.js";
+import { impactRouter } from "./routes/impact.js";
+import { commentsRouter } from "./routes/comments.js";
+import { approvalsRouter } from "./routes/approvals.js";
+import { auditLogRouter } from "./routes/auditLog.js";
+import { crawlRouter } from "./routes/crawl.js";
 
 export const router = Router();
+
+router.use("/test-cases", testCasesRouter);
+router.use("/flaky-tests", flakyTestsRouter);
+router.use("/impact", impactRouter);
+router.use("/comments", commentsRouter);
+router.use("/approvals", approvalsRouter);
+router.use("/audit", auditLogRouter);
+router.use("/crawl", crawlRouter);
 
 // ─── Config ──────────────────────────────────────────────────────────────
 
