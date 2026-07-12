@@ -22,7 +22,7 @@ on:
         type: string
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
   OLLAMA_MODEL: ${{ secrets.OLLAMA_MODEL || 'llama3.2-vision:11b' }}
   AI_ENABLED: ${{ secrets.AI_ENABLED || 'true' }}
@@ -33,7 +33,7 @@ jobs:
     name: Visual Regression
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -83,7 +83,7 @@ jobs:
           else
             echo "mode=test" >> $GITHUB_OUTPUT
           fi
-          
+
           if [ "${{ github.event.inputs.pages }}" != "" ] && [ "${{ github.event.inputs.pages }}" != "all" ]; then
             echo "pages=${{ github.event.inputs.pages }}" >> $GITHUB_OUTPUT
           fi
@@ -124,21 +124,21 @@ jobs:
             PASSED=$(grep -o '✅ Pass' "$REPORT_FILE" | wc -l)
             FAILED=$(grep -o '❌ Fail' "$REPORT_FILE" | wc -l)
             TOTAL=$((PASSED + FAILED))
-            
+
             cat > pr-comment.md << EOF
-            ## 🔍 Visual QA Report
-            
-            **Run ID:** ${{ github.run_id }}
-            **Mode:** Test
-            **Pages Tested:** $TOTAL
-            **Passed:** $PASSED ✅
-            **Failed:** $FAILED $([ $FAILED -gt 0 ] && echo '❌' || echo '✅')
-            
-            ### Details
-            | Page | Status | Diff % | AI Classification |
-            |------|--------|--------|-------------------|
-            EOF
-            
+          ## 🔍 Visual QA Report
+
+          **Run ID:** ${{ github.run_id }}
+          **Mode:** Test
+          **Pages Tested:** $TOTAL
+          **Passed:** $PASSED ✅
+          **Failed:** $FAILED $([ $FAILED -gt 0 ] && echo '❌' || echo '✅')
+
+          ### Details
+          | Page | Status | Diff % | AI Classification |
+          |------|--------|--------|-------------------|
+          EOF
+
             # Extract table rows from report
             grep -A 1000 '<tbody>' "$REPORT_FILE" | grep -E '(pass-row|fail-row)' | head -20 | while IFS= read -r line; do
               PAGE=$(echo "$line" | sed -n 's/.*<strong>\([^<]*\)<\/strong>.*/\1/p')
@@ -147,7 +147,7 @@ jobs:
               AI_CLASS=$(echo "$line" | sed -n 's/.*class="ai-badge"[^>]*>\([^<]*\)<\/span>.*/\1/p')
               echo "| $PAGE | $STATUS | $DIFF% | $AI_CLASS |" >> pr-comment.md
             done
-            
+
             echo "" >> pr-comment.md
             echo "> View full report: [Download Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> pr-comment.md
           else
@@ -161,16 +161,16 @@ jobs:
           script: |
             const fs = require('fs');
             const comment = fs.readFileSync('pr-comment.md', 'utf8');
-            
+
             // Find existing comment
             const comments = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number
             });
-            
+
             const existingComment = comments.data.find(c => c.body.includes('Visual QA Report'));
-            
+
             if (existingComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -218,7 +218,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     needs: visual-regression
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -228,7 +228,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -239,11 +239,11 @@ jobs:
         run: |
           # Get changed files
           CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
-          
+
           echo "changed_files<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          
+
           # Simple heuristic: if CSS/JS/components changed, suggest affected pages
           AFFECTED_PAGES=""
           if echo "$CHANGED_FILES" | grep -qE '\.(css|scss|sass|less)$'; then
@@ -255,7 +255,7 @@ jobs:
           else
             AFFECTED_PAGES="unknown"
           fi
-          
+
           echo "affected_pages=$AFFECTED_PAGES" >> $GITHUB_OUTPUT
 
       - name: Post Impact Analysis
@@ -263,24 +263,24 @@ jobs:
         with:
           script: |
             const comment = `## 🎯 Test Impact Analysis
-            
+
             **Changed Files:**
             \`\`\`
             ${process.env.CHANGED_FILES || 'None'}
             \`\`\`
-            
+
             **Recommended Pages to Test:** ${process.env.AFFECTED_PAGES || 'All'}
-            
+
             _Run \`visual-qa test\` with specific pages to target affected areas._`;
-            
+
             const comments = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number
             });
-            
+
             const existing = comments.data.find(c => c.body.includes('Test Impact Analysis'));
-            
+
             if (existing) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
