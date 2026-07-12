@@ -1,0 +1,300 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Config {
+  id        String   @id @default(cuid())
+  viewport  Json
+  threshold Float
+  waitFor   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Page {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  url           String
+  waitForSelector String?
+  mask          String[]
+  threshold     Float?
+  viewport      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  baselines     Baseline[]
+  testRuns      TestRun[]
+  schedules     Schedule[] @relation("PageSchedules")
+  testCases     TestCase[]
+  flakyTests    FlakyTest[]
+  comments      Comment[]
+  approvals     Approval[]
+}
+
+model Baseline {
+  id        String   @id @default(cuid())
+  pageId    String
+  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  imagePath String
+  imageHash String   @unique
+  viewport  Json
+  createdAt DateTime @default(now())
+  testRuns  TestRun[]
+}
+
+model TestRun {
+  id            String     @id @default(cuid())
+  pageId        String
+  page          Page       @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  baselineId    String?
+  baseline      Baseline?  @relation(fields: [baselineId], references: [id])
+  status        TestStatus
+  diffPercent   Float
+  diffPixels    Int
+  totalPixels   Int
+  currentPath   String
+  diffPath      String?
+  error         String?
+  aiAnalysis    Json?
+  startedAt     DateTime   @default(now())
+  completedAt   DateTime?
+  duration      Int?
+  aiAnalysisRel AiAnalysis?
+  report        Report?    @relation(fields: [reportId], references: [id])
+  reportId      String?
+  comments      Comment[]
+  approvals     Approval[]
+}
+
+model Report {
+  id        String    @id @default(cuid())
+  filename  String    @unique
+  path      String
+  size      Int
+  testRuns  TestRun[]
+  createdAt DateTime  @default(now())
+}
+
+model Schedule {
+  id             String       @id @default(cuid())
+  name           String
+  cronExpression String
+  mode           ScheduleMode
+  enabled        Boolean      @default(true)
+  pageIds        String[]
+  pages          Page[]       @relation("PageSchedules")
+  lastRun        DateTime?
+  nextRun        DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  runs           ScheduleRun[]
+}
+
+model ScheduleRun {
+  id         String   @id @default(cuid())
+  scheduleId String
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  status     ScheduleRunStatus
+  startedAt  DateTime @default(now())
+  completedAt DateTime?
+  result     Json?
+  error      String?
+}
+
+enum TestStatus {
+  PASSED
+  FAILED
+  ERROR
+  PENDING
+  AI_ACCEPTED
+  AI_INVESTIGATE
+  AI_REJECTED
+  BASELINE_UPDATED
+}
+
+enum ScheduleMode {
+  BASELINE
+  TEST
+}
+
+enum ScheduleRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+model TestCase {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  selector    String
+  action      String
+  expected    String
+  pageId      String
+  page        Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FlakyTest {
+  id          String   @id @default(cuid())
+  pageId      String   @unique
+  page        Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  failureRate Float
+  lastFailure DateTime?
+  occurrences Int      @default(0)
+  quarantined Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AiAnalysis {
+  id              String   @id @default(cuid())
+  testRunId       String   @unique
+  testRun         TestRun  @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+  model           String
+  passed          Boolean
+  diffPercent     Float
+  functionalImpact String
+  rootCause       String
+  suggestedAction String
+  confidence      Float
+  details         Json
+  tokensUsed      Int?
+  createdAt       DateTime @default(now())
+}
+
+// ─── Collaboration Models ─────────────────────────────────────────────────────
+
+model Comment {
+  id        String       @id @default(cuid())
+  content   String
+  authorId  String
+  authorName String
+  authorAvatar String?
+  entityType CommentEntityType
+  entityId  String
+  pageId    String?
+  page      Page?        @relation(fields: [pageId], references: [id])
+  testRunId String?
+  testRun   TestRun?     @relation(fields: [testRunId], references: [id])
+  userId    String?
+  user      User?        @relation("UserComments", fields: [userId], references: [id])
+  parentId  String?
+  parent    Comment?     @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[]    @relation("CommentReplies")
+  resolved  Boolean      @default(false)
+  resolvedBy String?
+  resolvedAt DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  deletedAt DateTime?
+  
+  @@index([entityType, entityId])
+  @@index([pageId])
+  @@index([testRunId])
+  @@index([userId])
+}
+
+enum CommentEntityType {
+  TEST_RUN
+  PAGE
+  BASELINE
+  REPORT
+  TEST_CASE
+}
+
+model Approval {
+  id          String         @id @default(cuid())
+  entityType  ApprovalEntityType
+  entityId    String
+  pageId      String?
+  page        Page?          @relation(fields: [pageId], references: [id])
+  testRunId   String?
+  testRun     TestRun?       @relation(fields: [testRunId], references: [id])
+  status      ApprovalStatus @default(PENDING)
+  requestedBy String
+  requestedByName String
+  approvedBy  String?
+  approvedByName String?
+  approvedAt  DateTime?
+  rejectedBy  String?
+  rejectedByName String?
+  rejectedAt  DateTime?
+  reason      String?
+  expiresAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  userId      String?
+  user        User?          @relation("UserApprovals", fields: [userId], references: [id])
+  
+  @@index([entityType, entityId])
+  @@index([pageId])
+  @@index([testRunId])
+  @@index([status])
+  @@index([userId])
+}
+
+enum ApprovalEntityType {
+  BASELINE_UPDATE
+  TEST_CASE
+  FLAKY_TEST_QUARANTINE
+  AI_MODEL_CHANGE
+  CONFIG_CHANGE
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String
+  entityType  String
+  entityId    String
+  userId      String
+  userName    String
+  userEmail   String?
+  ipAddress   String?
+  userAgent   String?
+  oldValue    Json?
+  newValue    Json?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  avatar        String?
+  role          UserRole @default(VIEWER)
+  provider      String   @default("local") // local, github, gitlab, google
+  providerId    String?
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  comments      Comment[] @relation("UserComments")
+  approvals     Approval[] @relation("UserApprovals")
+}
+
+enum UserRole {
+  ADMIN
+  QA_LEAD
+  QA_ENGINEER
+  DEVELOPER
+  VIEWER
+}

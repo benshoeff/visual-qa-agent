@@ -1,0 +1,35 @@
+{
+  "url": "https://qa-sandbox-app.vercel.app/roles",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "timestamp": "2026-07-12T06:29:47.068Z",
+  "lighthouse": {
+    "performance": 100,
+    "accessibility": 85,
+    "bestPractices": 96,
+    "seo": 80,
+    "pwa": 0,
+    "coreWebVitals": {
+      "lcp": 391,
+      "fid": 16,
+      "cls": 0.002329454075825234,
+      "fcp": 276,
+      "ttfb": 62,
+      "inp": 0
+    }
+  },
+  "budget": {
+    "lcp": 2500,
+    "fid": 100,
+    "cls": 0.1,
+    "fcp": 1800,
+    "ttfb": 800,
+    "inp": 200,
+    "performanceScore": 90
+  },
+  "passed": true,
+  "budgetViolations": [],
+  "trends": []
+}

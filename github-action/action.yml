@@ -1,0 +1,210 @@
+name: 'Visual QA Action'
+description: 'Run visual regression tests in GitHub Actions'
+author: 'Visual QA Agent'
+inputs:
+  mode:
+    description: 'Test mode: test or baseline'
+    required: false
+    default: 'test'
+  pages:
+    description: 'Comma-separated list of pages to test, or "all"'
+    required: false
+    default: 'all'
+  ai_enabled:
+    description: 'Enable AI-powered visual analysis'
+    required: false
+    default: 'true'
+  ollama_model:
+    description: 'Ollama model to use for AI analysis'
+    required: false
+    default: 'llama3.2-vision:11b'
+  fail_on_regression:
+    description: 'Fail the workflow if visual regressions are detected'
+    required: false
+    default: 'true'
+  comment_on_pr:
+    description: 'Post results as PR comment'
+    required: false
+    default: 'true'
+  upload_artifacts:
+    description: 'Upload test artifacts (baselines, diffs, reports)'
+    required: false
+    default: 'true'
+
+outputs:
+  passed:
+    description: 'Number of passed tests'
+    value: ${{ steps.run-tests.outputs.passed }}
+  failed:
+    description: 'Number of failed tests'
+    value: ${{ steps.run-tests.outputs.failed }}
+  report_url:
+    description: 'URL to the generated report'
+    value: ${{ steps.run-tests.outputs.report_url }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Install Playwright browsers
+      shell: bash
+      run: npx playwright install --with-deps chromium firefox webkit
+
+    - name: Setup Ollama (if AI enabled)
+      if: ${{ inputs.ai_enabled == 'true' }}
+      shell: bash
+      run: |
+        curl -fsSL https://ollama.com/install.sh | sh
+        ollama serve &
+        sleep 5
+        ollama pull ${{ inputs.ollama_model }}
+
+    - name: Run Visual QA Tests
+      id: run-tests
+      shell: bash
+      env:
+        AI_ENABLED: ${{ inputs.ai_enabled }}
+        OLLAMA_MODEL: ${{ inputs.ollama_model }}
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      run: |
+        if [ "${{ inputs.mode }}" == "baseline" ]; then
+          npm run baseline
+        else
+          if [ "${{ inputs.pages }}" != "all" ]; then
+            PAGES="${{ inputs.pages }}" npm run test
+          else
+            npm run test
+          fi
+        fi
+        
+        # Count results
+        REPORT_FILE=$(ls -t reports/report-*.html 2>/dev/null | head -1)
+        if [ -f "$REPORT_FILE" ]; then
+          PASSED=$(grep -c 'class="pass-row"' "$REPORT_FILE" || echo 0)
+          FAILED=$(grep -c 'class="fail-row"' "$REPORT_FILE" || echo 0)
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          
+          # Store report path for artifact upload
+          echo "report_file=$REPORT_FILE" >> $GITHUB_OUTPUT
+        else
+          echo "passed=0" >> $GITHUB_OUTPUT
+          echo "failed=0" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload Artifacts
+      if: ${{ inputs.upload_artifacts == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: visual-qa-results
+        path: |
+          baselines/
+          current/
+          diffs/
+          reports/
+        retention-days: 30
+
+    - name: Post PR Comment
+      if: ${{ github.event_name == 'pull_request' && inputs.comment_on_pr == 'true' }}
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const reportFile = '${{ steps.run-tests.outputs.report_file }}';
+          
+          let comment = `## 🔍 Visual QA Report\n\n`;
+          comment += `**Workflow:** ${process.env.GITHUB_WORKFLOW}\n`;
+          comment += `**Run:** #${process.env.GITHUB_RUN_NUMBER}\n`;
+          comment += `**Mode:** ${{ inputs.mode }}\n\n`;
+          
+          if (fs.existsSync(reportFile)) {
+            const passed = '${{ steps.run-tests.outputs.passed }}';
+            const failed = '${{ steps.run-tests.outputs.failed }}';
+            comment += `**Passed:** ${passed} ✅\n`;
+            comment += `**Failed:** ${failed} ${failed > 0 ? '❌' : '✅'}\n\n`;
+            
+            // Try to extract table data
+            const content = fs.readFileSync(reportFile, 'utf8');
+            const rows = content.match(/<tr class="(pass|fail)-row">[\s\S]*?<\/tr>/g) || [];
+            
+            if (rows.length > 0) {
+              comment += `### Details\n`;
+              comment += `| Page | Status | Diff % | AI Classification |\n`;
+              comment += `|------|--------|--------|-------------------|\n`;
+              
+              rows.slice(0, 20).forEach(row => {
+                const pageMatch = row.match(/<strong>([^<]+)<\/strong>/);
+                const statusMatch = row.match(/class="(pass|fail)"/);
+                const diffMatch = row.match(/<td>([^<]+)%<\/td>/);
+                const aiMatch = row.match(/class="ai-badge"[^>]*>([^<]+)<\/span>/);
+                
+                const page = pageMatch ? pageMatch[1] : 'Unknown';
+                const status = statusMatch ? (statusMatch[1] === 'pass' ? '✅' : '❌') : '?';
+                const diff = diffMatch ? diffMatch[1] : '0';
+                const ai = aiMatch ? aiMatch[1] : '—';
+                
+                comment += `| ${page} | ${status} | ${diff}% | ${ai} |\n`;
+              });
+            }
+            
+            comment += `\n> [View Full Report Artifacts](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})`;
+          } else {
+            comment += `No report generated.\n`;
+          }
+          
+          // Find or create comment
+          const comments = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.payload.pull_request.number
+          });
+          
+          const existingComment = comments.data.find(c => c.body.includes('Visual QA Report'));
+          
+          if (existingComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existingComment.id,
+              body: comment
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: comment
+            });
+          }
+
+    - name: Add PR Annotations
+      if: ${{ github.event_name == 'pull_request' && inputs.mode == 'test' }}
+      shell: bash
+      run: |
+        REPORT_FILE="${{ steps.run-tests.outputs.report_file }}"
+        if [ -f "$REPORT_FILE" ]; then
+          grep -E 'class="fail-row"' "$REPORT_FILE" | while IFS= read -r line; do
+            PAGE=$(echo "$line" | sed -n 's/.*<strong>\([^<]*\)<\/strong>.*/\1/p')
+            DIFF=$(echo "$line" | sed -n 's/.*<td>\([^<]*\)%<\/td>.*/\1/p' | head -1)
+            echo "::error title=Visual Regression::$PAGE has $DIFF% visual difference"
+          done
+        fi
+
+    - name: Fail on Regression
+      if: ${{ inputs.fail_on_regression == 'true' && inputs.mode == 'test' }}
+      shell: bash
+      run: |
+        FAILED="${{ steps.run-tests.outputs.failed }}"
+        if [ "$FAILED" -gt 0 ]; then
+          echo "::error::Visual regression detected on $FAILED page(s)"
+          exit 1
+        fi
