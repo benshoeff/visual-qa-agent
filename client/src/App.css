@@ -276,14 +276,13 @@ h2 {
 .table {
   width: 100%;
   border-collapse: collapse;
-  background: var(--bg-card);
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--border);
 }
 
 .table th {
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--bg-card);
   padding: 0.75rem 1rem;
   text-align: left;
   font-size: 0.78rem;
@@ -298,6 +297,15 @@ h2 {
   border-top: 1px solid var(--border);
   font-size: 0.9rem;
   vertical-align: middle;
+  background: var(--bg-card);
+}
+
+.row-pass td {
+  background: rgba(34, 197, 94, 0.04);
+}
+
+.row-fail td {
+  background: rgba(239, 68, 68, 0.04);
 }
 
 .row-pass td:first-child {
