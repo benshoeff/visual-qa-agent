@@ -10,6 +10,7 @@ RUN npm ci --include=dev --prefix client
 
 COPY . .
 
+RUN npx prisma generate
 RUN cd client && ./node_modules/.bin/vite build
 
 EXPOSE 10000
