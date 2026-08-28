@@ -12,6 +12,15 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+async function requestText(url: string): Promise<string> {
+  const res = await fetch(`${BASE}${url}`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || 'Request failed')
+  }
+  return res.text()
+}
+
 export interface PageConfig {
   name: string
   url: string
@@ -65,36 +74,55 @@ export async function addPage(page: PageConfig): Promise<PageConfig> {
 }
 
 export async function updatePage(name: string, page: Partial<PageConfig>): Promise<PageConfig> {
-  return request<PageConfig>(`/api/pages/${encodeURIComponent(name)}`, {
+  return request<PageConfig>(`/api/pages?name=${encodeURIComponent(name)}`, {
     method: 'PUT',
     body: JSON.stringify(page),
   })
 }
 
 export async function deletePage(name: string): Promise<void> {
-  await request(`/api/pages/${encodeURIComponent(name)}`, { method: 'DELETE' })
+  await request(`/api/pages?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
 }
 
-export async function runBaseline(pages?: string[]): Promise<{ success: boolean; message: string }> {
-  return request('/api/run/baseline', {
+export type RunMode = 'test' | 'baseline' | 'crawl'
+
+export async function dispatchRun(
+  mode: RunMode,
+  options: { pages?: string[]; url?: string; crawlConfig?: Record<string, unknown> } = {}
+): Promise<{ success: boolean; message: string }> {
+  return request('/api/dispatch', {
     method: 'POST',
-    ...(pages ? { body: JSON.stringify({ pages }) } : {}),
+    body: JSON.stringify({ mode, pages: options.pages, url: options.url, crawlConfig: options.crawlConfig }),
   })
 }
 
-export async function runTest(pages?: string[]): Promise<{ results: CompareResult[] }> {
-  return request<{ results: CompareResult[] }>('/api/run/test', {
-    method: 'POST',
-    ...(pages ? { body: JSON.stringify({ pages }) } : {}),
-  })
+export interface RunStatus {
+  id: number
+  runNumber: number
+  status: string
+  conclusion: string | null
+  createdAt: string
+  updatedAt: string
+  htmlUrl: string
 }
 
-export async function runPageBaseline(name: string): Promise<{ success: boolean; message: string }> {
-  return request(`/api/pages/${encodeURIComponent(name)}/baseline`, { method: 'POST' })
+export async function getRunStatus(): Promise<RunStatus[]> {
+  const data = await request<{ runs: RunStatus[] }>('/api/status')
+  return data.runs
 }
 
-export async function runPageTest(name: string): Promise<{ result: CompareResult }> {
-  return request<{ result: CompareResult }>(`/api/pages/${encodeURIComponent(name)}/test`, { method: 'POST' })
+const WAIT_FOR_STATES = ['queued', 'in_progress', 'pending', 'requested', 'waiting']
+
+export function isRunPending(r: RunStatus | undefined): boolean {
+  return !!r && WAIT_FOR_STATES.includes(r.status)
+}
+
+export function isRunDone(r: RunStatus | undefined): boolean {
+  return !!r && !WAIT_FOR_STATES.includes(r.status)
+}
+
+export function runConclusion(r: RunStatus | undefined): 'success' | 'neutral' | 'skipped' | 'cancelled' | 'timed_out' | 'action_required' | 'failure' | 'startup_failure' | 'stale' | null {
+  return r?.status === 'completed' && r.conclusion ? (r.conclusion as never) : null
 }
 
 export async function getReports(): Promise<ReportFile[]> {
@@ -102,11 +130,15 @@ export async function getReports(): Promise<ReportFile[]> {
 }
 
 export function getReportUrl(filename: string): string {
-  return `/api/reports/${filename}`
+  return `/api/files?type=report&name=${encodeURIComponent(filename)}`
 }
 
 export function getImageUrl(type: 'baseline' | 'current' | 'diff', name: string): string {
-  return `/images/${type}/${name}.png`
+  return `/api/files?type=${type}&name=${encodeURIComponent(name)}`
+}
+
+export async function fetchReportHtml(filename: string): Promise<string> {
+  return requestText(getReportUrl(filename))
 }
 
 export interface Schedule {
@@ -131,19 +163,57 @@ export async function addSchedule(s: { name: string; cronExpression: string; mod
 }
 
 export async function updateSchedule(id: string, updates: Partial<Schedule>): Promise<Schedule> {
-  return request<Schedule>(`/api/schedules/${id}`, {
+  return request<Schedule>(`/api/schedules?id=${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify(updates),
   })
 }
 
 export async function deleteSchedule(id: string): Promise<void> {
-  await request(`/api/schedules/${id}`, { method: 'DELETE' })
+  await request(`/api/schedules?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
-export async function validateCron(cronExpression: string): Promise<{ valid: boolean; nextRun: string | null }> {
-  return request('/api/schedules/validate', {
+export function validateCron(cronExpression: string): { valid: boolean; nextRun: string | null } {
+  const valid = /^(\*|[0-9]+)(\s+(\*|[0-9]+)){4}$/.test(cronExpression.trim())
+  return { valid, nextRun: valid ? 'Pending (runs via GitHub Actions schedule)' : null }
+}
+
+// Crawl
+export interface DiscoveredPage {
+  url: string
+  name: string
+  depth: number
+  parentUrl?: string
+}
+
+export interface CrawlJob {
+  id: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  startUrl: string
+  discoveredPages: DiscoveredPage[]
+  error?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export async function startCrawl(url: string, crawlConfig: Record<string, unknown> = {}): Promise<{ jobId: string }> {
+  return request<{ jobId: string }>('/api/crawl', {
     method: 'POST',
-    body: JSON.stringify({ cronExpression }),
+    body: JSON.stringify({ url, config: crawlConfig }),
+  })
+}
+
+export async function getCrawlJob(jobId: string): Promise<CrawlJob | null> {
+  try {
+    return await request<CrawlJob>(`/api/crawl?id=${encodeURIComponent(jobId)}`)
+  } catch {
+    return null
+  }
+}
+
+export async function confirmBaselines(jobId: string, pageNames: string[]): Promise<{ added: number; skipped: number }> {
+  return request(`/api/crawl?id=${encodeURIComponent(jobId)}&confirm=true`, {
+    method: 'POST',
+    body: JSON.stringify({ pageNames }),
   })
 }

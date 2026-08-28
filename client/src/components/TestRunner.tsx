@@ -1,17 +1,51 @@
-import { useState, useEffect } from 'react'
-import { runBaseline, runTest, getPages } from '../api'
-import type { CompareResult, PageConfig } from '../api'
+import { useState, useEffect, useRef } from 'react'
+import { getPages, dispatchRun, getRunStatus, isRunPending, runConclusion } from '../api'
+import type { PageConfig, RunStatus } from '../api'
 
 export default function TestRunner() {
   const [loading, setLoading] = useState<'baseline' | 'test' | null>(null)
-  const [results, setResults] = useState<CompareResult[] | null>(null)
   const [error, setError] = useState('')
   const [pages, setPages] = useState<PageConfig[]>([])
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set())
+  const [runStatus, setRunStatus] = useState<RunStatus | null>(null)
+  const polling = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     getPages().then(setPages)
+    getRunStatus().then((runs) => setRunStatus(runs[0] ?? null)).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    return () => {
+      if (polling.current) clearInterval(polling.current)
+    }
+  }, [])
+
+  const stopPolling = () => {
+    if (polling.current) {
+      clearInterval(polling.current)
+      polling.current = null
+    }
+  }
+
+  const startPolling = () => {
+    stopPolling()
+    polling.current = setInterval(async () => {
+      try {
+        const runs = await getRunStatus()
+        const latest = runs[0] ?? null
+        setRunStatus(latest)
+        if (latest && !isRunPending(latest)) {
+          stopPolling()
+          setLoading(null)
+          getPages().then(setPages).catch(() => {})
+        }
+      } catch {
+        stopPolling()
+        setLoading(null)
+      }
+    }, 15000)
+  }
 
   const allSelected = pages.length > 0 && selectedPages.size === pages.length
 
@@ -39,48 +73,31 @@ export default function TestRunner() {
     return names
   }
 
-  const handleBaseline = async () => {
-    setLoading('baseline')
-    setResults(null)
+  const handleRun = async (mode: 'baseline' | 'test') => {
+    const names = getSelectedNames()
+    if (!names || names.length === 0) {
+      setError('Select at least one page to run')
+      return
+    }
     setError('')
+    setLoading(mode)
+    setRunStatus(null)
     try {
-      await runBaseline(getSelectedNames())
-      setResults(null)
+      await dispatchRun(mode, { pages: names })
+      startPolling()
     } catch (e) {
       setError((e as Error).message)
-    } finally {
       setLoading(null)
     }
   }
 
-  const handleTest = async () => {
-    setLoading('test')
-    setResults(null)
-    setError('')
-    try {
-      const data = await runTest(getSelectedNames())
-      setResults(data.results)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setLoading(null)
-    }
-  }
-
-  const passed = results ? results.filter((r) => r.passed).length : 0
-  const failed = results ? results.filter((r) => !r.passed).length : 0
+  const conclusion = runConclusion(runStatus)
 
   return (
     <div>
       <h1>Test Runner</h1>
-
-      <div className="cards">
-        <div className="card">
-          <div className="card-body">
-            <div className="card-value">{pages.length}</div>
-            <div className="card-label">Pages configured</div>
-          </div>
-        </div>
+      <div className="card-header-note">
+        Runs are executed in GitHub Actions and will appear below once started.
       </div>
 
       <div className="section">
@@ -112,14 +129,14 @@ export default function TestRunner() {
         <div className="action-buttons">
           <button
             className="btn btn-primary"
-            onClick={handleBaseline}
+            onClick={() => handleRun('baseline')}
             disabled={loading !== null || selectedPages.size === 0}
           >
             {loading === 'baseline' ? '⏳ Capturing...' : '📸 Capture Baseline'}
           </button>
           <button
             className="btn btn-accent"
-            onClick={handleTest}
+            onClick={() => handleRun('test')}
             disabled={loading !== null || selectedPages.size === 0}
           >
             {loading === 'test' ? '⏳ Running...' : '🔍 Run Tests'}
@@ -132,7 +149,7 @@ export default function TestRunner() {
           <div className="loader">
             <div className="spinner" />
             <span>
-              {loading === 'baseline' ? 'Capturing baseline screenshots...' : 'Running visual tests...'}
+              {loading === 'baseline' ? 'Capturing baseline screenshots...' : 'Running visual tests...'} This can take a few minutes.
             </span>
           </div>
         )}
@@ -140,53 +157,33 @@ export default function TestRunner() {
 
       {error && <div className="error-banner">{error}</div>}
 
-      {results && (
+      {runStatus && (
         <div className="section">
-          <div className="summary-bar">
-            <span className="summary-pass">✅ Passed: {passed}</span>
-            <span className="summary-fail">❌ Failed: {failed}</span>
-            <span className="summary-total">📄 Total: {results.length}</span>
+          <h2>Latest Run</h2>
+          <div className="result-card">
+            <div>
+              <strong>Run #{runStatus.runNumber}</strong> —{' '}
+              {isRunPending(runStatus) ? (
+                <span className="status-pending">⏳ Running…</span>
+              ) : (
+                <span className={conclusion === 'success' ? 'status-pass' : 'status-fail'}>
+                  {conclusion === 'success' ? '✅ Completed successfully' : `❌ ${runStatus.conclusion ?? 'failed'}`}
+                </span>
+              )}
+            </div>
+            <div>
+              <a href={runStatus.htmlUrl} target="_blank" rel="noreferrer" className="btn btn-sm">
+                View Run Logs ↗
+              </a>
+              &nbsp;
+              <a href="/reports" className="btn btn-sm">
+                📋 View Reports
+              </a>
+            </div>
+            {isRunPending(runStatus) && (
+              <div className="hint">Polling for completion every 15s...</div>
+            )}
           </div>
-
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Page</th>
-                <th>Status</th>
-                <th>Diff %</th>
-                <th>Diff Pixels</th>
-                <th>Screenshots</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((r) => (
-                <tr key={r.pageName} className={r.passed ? 'row-pass' : 'row-fail'}>
-                  <td>
-                    <strong>{r.pageName}</strong>
-                  </td>
-                  <td>
-                    {r.error ? (
-                      <span className="status-error">⚠️ {r.error}</span>
-                    ) : r.passed ? (
-                      <span className="status-pass">✅ Pass</span>
-                    ) : (
-                      <span className="status-fail">❌ Fail</span>
-                    )}
-                  </td>
-                  <td>{r.diffPercent}%</td>
-                  <td>{r.diffPixels.toLocaleString()}</td>
-                  <td>
-                    <a
-                      className="btn btn-sm"
-                      href={`/reports?view=${r.pageName}`}
-                    >
-                      View
-                    </a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
     </div>

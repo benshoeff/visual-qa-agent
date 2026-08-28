@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getReports, getReportUrl, getImageUrl } from '../api'
+import { getReports, getReportUrl, getImageUrl, fetchReportHtml } from '../api'
 import type { ReportFile } from '../api'
 import DiffSlider from './DiffSlider'
 
@@ -31,8 +31,7 @@ export default function ReportViewer() {
   const viewReport = async (filename: string) => {
     setSelectedReport(filename)
     try {
-      const res = await fetch(getReportUrl(filename))
-      const html = await res.text()
+      const html = await fetchReportHtml(filename)
       const parser = new DOMParser()
       const doc = parser.parseFromString(html, 'text/html')
 

@@ -1,0 +1,38 @@
+name: Cleanup Generated Files
+
+on:
+  schedule:
+    - cron: '0 3 * * 0' # Sunday 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Remove temporary/generated files
+        run: |
+          rm -f reports/*.html || true
+          rm -f current/*.png || true
+          rm -f diffs/*.png || true
+          rm -f crawl-results/*.json || true
+          rm -f crawl-jobs/*.json || true
+
+      - name: Commit cleanup
+        run: |
+          git config user.name "visual-qa-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A reports current diffs crawl-results crawl-jobs 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "Nothing to clean"
+          else
+            git commit -m "chore(visual-qa): weekly cleanup of temporary files [skip ci]"
+            git push origin main
+          fi
