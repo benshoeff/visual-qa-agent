@@ -5,6 +5,8 @@
   "scripts": {
     "baseline": "tsx src/agent.ts --mode=baseline",
     "test": "tsx src/agent.ts --mode=test",
+    "crawl": "tsx scripts/crawl.ts",
+    "run:scheduled": "node scripts/run-scheduled.mjs",
     "server": "tsx src/server.ts",
     "dev:server": "tsx watch src/server.ts",
     "dev:client": "npm run dev --prefix client",
@@ -40,6 +42,7 @@
     "@types/node-cron": "^3.0.11",
     "@types/pixelmatch": "^5.2.6",
     "@types/pngjs": "^6.0.4",
+    "@vercel/node": "^3.2.1",
     "concurrently": "^9.2.3",
     "prisma": "^5.22.0",
     "typescript": "^5.4.0"

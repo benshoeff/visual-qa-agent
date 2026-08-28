@@ -1,142 +1,99 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { startCrawl, getCrawlJob, confirmBaselines } from '../api'
+import type { CrawlJob } from '../api'
 
-interface CrawlConfig {
+interface CrawlConfigInput {
   maxPages: number
   maxDepth: number
   sameDomainOnly: boolean
   waitFor: 'networkidle' | 'domcontentloaded' | 'load'
 }
 
-interface DiscoveredPage {
-  url: string
-  name: string
-  depth: number
-  parentUrl?: string
-}
-
-interface CrawlResult {
-  pageName: string
-  url: string
-  success: boolean
-  baselinePath?: string
-  error?: string
-}
-
-interface CrawlJob {
-  id: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
-  startUrl: string
-  config: CrawlConfig
-  progress: {
-    current: number
-    total: number
-    currentUrl: string
-  }
-  discoveredPages: DiscoveredPage[]
-  results: CrawlResult[]
-  error?: string
-  createdAt: string
-  updatedAt: string
-}
-
-const API_BASE = '/api'
-
 export default function CrawlManager() {
   const [url, setUrl] = useState('')
-  const [config, setConfig] = useState<CrawlConfig>({
+  const [config, setConfig] = useState<CrawlConfigInput>({
     maxPages: 50,
     maxDepth: 3,
     sameDomainOnly: true,
     waitFor: 'networkidle',
   })
   const [autoCapture, setAutoCapture] = useState(true)
-  const [jobs, setJobs] = useState<CrawlJob[]>([])
+  const [starting, setStarting] = useState(false)
   const [activeJob, setActiveJob] = useState<CrawlJob | null>(null)
-  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null)
+  const [polling, setPolling] = useState(false)
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set())
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const fetchJobs = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/crawl`)
-      if (res.ok) {
-        const data = await res.json()
-        setJobs(data)
-      }
-    } catch (err) {
-      console.error('Failed to fetch jobs:', err)
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
     }
   }, [])
 
-  const fetchJob = useCallback(async (jobId: string) => {
-    try {
-      const res = await fetch(`${API_BASE}/crawl/${jobId}`)
-      if (res.ok) {
-        const job = await res.json()
-        setActiveJob(job)
-        return job
-      }
-    } catch (err) {
-      console.error('Failed to fetch job:', err)
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+      setPolling(false)
     }
-    return null
-  }, [])
+  }
 
-  const startPolling = useCallback((jobId: string) => {
-    if (pollInterval) clearInterval(pollInterval)
-    const interval = setInterval(() => {
-      fetchJob(jobId).then((job) => {
-        if (job && ['completed', 'failed'].includes(job.status)) {
-          if (pollInterval) clearInterval(pollInterval)
-          setPollInterval(null)
-          fetchJobs()
+  const startPolling = (jobId: string, alreadyDone = false) => {
+    if (alreadyDone) return
+    setPolling(true)
+    pollRef.current = setInterval(async () => {
+      try {
+        const job = await getCrawlJob(jobId)
+        if (job) {
+          setActiveJob(job)
+          if (job.status === 'completed' || job.status === 'failed') {
+            stopPolling()
+          }
         }
-      })
-    }, 2000)
-    setPollInterval(interval)
-  }, [pollInterval, fetchJob, fetchJobs])
+      } catch {
+        stopPolling()
+      }
+    }, 15000)
+  }
 
   const handleStartCrawl = async () => {
     if (!url.trim()) return
+    setStarting(true)
     try {
-      const res = await fetch(`${API_BASE}/crawl`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim(), config, autoCaptureBaseline: autoCapture }),
+      const { jobId } = await startCrawl(url.trim(), {
+        maxPages: config.maxPages,
+        maxDepth: config.maxDepth,
+        sameDomainOnly: config.sameDomainOnly,
+        waitFor: config.waitFor,
       })
-      if (res.ok) {
-        const { jobId } = await res.json()
-        setUrl('')
-        await fetchJob(jobId)
-        startPolling(jobId)
-      } else {
-        const err = await res.json()
-        alert(err.error || 'Failed to start crawl')
-      }
+      setUrl('')
+      // Initial optimistic job entry while Actions starts
+      setActiveJob({
+        id: jobId,
+        status: 'pending',
+        startUrl: url.trim(),
+        discoveredPages: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      setSelectedPages(new Set())
+      startPolling(jobId)
     } catch (err) {
-      alert('Failed to start crawl')
+      alert((err as Error).message || 'Failed to start crawl')
+    } finally {
+      setStarting(false)
     }
   }
 
   const handleConfirmBaselines = async () => {
     if (!activeJob || selectedPages.size === 0) return
     try {
-      const res = await fetch(`${API_BASE}/crawl/${activeJob.id}/confirm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageNames: Array.from(selectedPages) }),
-      })
-      if (res.ok) {
-        const result = await res.json()
-        alert(`Added ${result.added} pages, skipped ${result.skipped}`)
-        setSelectedPages(new Set())
-        fetchJobs()
-      } else {
-        const err = await res.json()
-        alert(err.error || 'Failed to confirm baselines')
-      }
+      const result = await confirmBaselines(activeJob.id, Array.from(selectedPages))
+      alert(`Added ${result.added} pages, skipped ${result.skipped}`)
+      setSelectedPages(new Set())
     } catch (err) {
-      alert('Failed to confirm baselines')
+      alert((err as Error).message || 'Failed to confirm baselines')
     }
   }
 
@@ -149,7 +106,7 @@ export default function CrawlManager() {
 
   const toggleAllPages = () => {
     if (activeJob) {
-      const allNames = activeJob.discoveredPages.map(p => p.name)
+      const allNames = activeJob.discoveredPages.map((p) => p.name)
       if (selectedPages.size === allNames.length) {
         setSelectedPages(new Set())
       } else {
@@ -158,20 +115,13 @@ export default function CrawlManager() {
     }
   }
 
-  useEffect(() => {
-    fetchJobs()
-    return () => {
-      if (pollInterval) clearInterval(pollInterval)
-    }
-  }, [fetchJobs, pollInterval])
-
-  const currentJob = activeJob || jobs[0]
+  const currentJob = activeJob
 
   return (
     <div className="crawl-manager">
       <header className="page-header">
         <h1>🔍 Site Crawler</h1>
-        <p>Discover pages and capture baselines automatically</p>
+        <p>Discover pages and capture baselines automatically (runs in GitHub Actions)</p>
       </header>
 
       <section className="card crawl-form">
@@ -256,8 +206,12 @@ export default function CrawlManager() {
           </label>
         </div>
 
-        <button className="btn btn-primary" onClick={handleStartCrawl} disabled={!url.trim()}>
-          {autoCapture ? '🔍 Crawl & Capture Baselines' : '🔍 Crawl Only'}
+        <button className="btn btn-primary" onClick={handleStartCrawl} disabled={!url.trim() || starting || polling}>
+          {starting || polling
+            ? '⏳ Crawl running in GitHub Actions...'
+            : autoCapture
+              ? '🔍 Crawl & Capture Baselines'
+              : '🔍 Crawl Only'}
         </button>
       </section>
 
@@ -269,23 +223,17 @@ export default function CrawlManager() {
             <span className={`status-badge ${currentJob.status}`}>{currentJob.status.toUpperCase()}</span>
           </div>
 
-          {currentJob.status === 'running' && (
-            <div className="progress-bar-container">
-              <div
-                className="progress-bar"
-                style={{ width: `${currentJob.progress.total > 0 ? (currentJob.progress.current / currentJob.progress.total) * 100 : 0}%` }}
-              ></div>
+          {(currentJob.status === 'pending' || currentJob.status === 'running') && (
+            <div className="loader">
+              <div className="spinner" />
+              <span>Crawling and capturing... This runs in GitHub Actions and can take several minutes.</span>
             </div>
           )}
-          {currentJob.status === 'running' && (
-            <p className="progress-text">
-              {currentJob.progress.phase === 'discovering' ? '🔍 Discovering pages...' : '📸 Capturing baselines...'}
-              {currentJob.progress.currentUrl && (
-                <>
-                  <br />Current: {currentJob.progress.currentUrl}
-                </>
-              )}
-            </p>
+
+          {currentJob.status === 'failed' && currentJob.error && (
+            <div className="error-message">
+              <strong>Error:</strong> {currentJob.error}
+            </div>
           )}
 
           {currentJob.status === 'completed' && currentJob.discoveredPages.length > 0 && (
@@ -304,40 +252,21 @@ export default function CrawlManager() {
                 </button>
               </div>
               <div className="pages-grid">
-                {currentJob.discoveredPages.map((page) => {
-                  const result = currentJob.results.find(r => r.pageName === page.name)
-                  const isSuccess = result?.success
-                  const isError = result?.success === false
-                  const alreadyExists = result?.error?.includes('Already exists')
-                  return (
-                    <div key={page.name} className={`page-card ${isSuccess ? 'success' : ''} ${isError ? 'error' : ''} ${alreadyExists ? 'exists' : ''}`}>
-                      <label className="page-checkbox-card">
-                        <input
-                          type="checkbox"
-                          checked={selectedPages.has(page.name)}
-                          onChange={() => togglePage(page.name)}
-                          disabled={alreadyExists}
-                        />
-                        <span className="page-name">{page.name}</span>
-                        {page.depth > 0 && <span className="depth-badge">Depth {page.depth}</span>}
-                      </label>
-                      <p className="page-url">{page.url}</p>
-                      {isSuccess && <span className="result-badge success">✅ Baseline captured</span>}
-                      {alreadyExists && <span className="result-badge exists">⚠️ Already in config</span>}
-                      {isError && <span className="result-badge error">❌ {result.error}</span>}
-                      {currentJob.status === 'running' && currentJob.progress.currentUrl === page.url && (
-                        <span className="result-badge processing">⏳ Processing...</span>
-                      )}
-                    </div>
-                  )
-                })}
+                {currentJob.discoveredPages.map((page) => (
+                  <div key={page.name} className="page-card">
+                    <label className="page-checkbox-card">
+                      <input
+                        type="checkbox"
+                        checked={selectedPages.has(page.name)}
+                        onChange={() => togglePage(page.name)}
+                      />
+                      <span className="page-name">{page.name}</span>
+                      {page.depth > 0 && <span className="depth-badge">Depth {page.depth}</span>}
+                    </label>
+                    <p className="page-url">{page.url}</p>
+                  </div>
+                ))}
               </div>
-            </div>
-          )}
-
-          {currentJob.status === 'failed' && (
-            <div className="error-message">
-              <strong>Error:</strong> {currentJob.error || 'Unknown error'}
             </div>
           )}
 
@@ -346,36 +275,6 @@ export default function CrawlManager() {
           )}
         </section>
       )}
-
-      <section className="card job-history">
-        <h2>Recent Crawl Jobs</h2>
-        {jobs.length === 0 ? (
-          <p className="no-jobs">No crawl jobs yet</p>
-        ) : (
-          <table className="jobs-table">
-            <thead>
-              <tr>
-                <th>URL</th>
-                <th>Status</th>
-                <th>Pages Found</th>
-                <th>Baselines Captured</th>
-                <th>Started</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.slice(0, 10).map((job) => (
-                <tr key={job.id} onClick={() => { fetchJob(job.id); startPolling(job.id); }}>
-                  <td title={job.startUrl}>{job.startUrl}</td>
-                  <td><span className={`status-badge ${job.status}`}>{job.status}</span></td>
-                  <td>{job.discoveredPages.length}</td>
-                  <td>{job.results.filter(r => r.success).length}</td>
-                  <td>{new Date(job.createdAt).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
     </div>
   )
 }

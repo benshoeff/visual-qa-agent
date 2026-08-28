@@ -2,69 +2,82 @@
 
 סוכן Visual Regression Testing – משווה צילומי מסך של דפי אינטרנט מול בייסליין ומזהה שינויים ויזואליים.
 
-## התקנה
+ארכיטקטורה **ענן חינמי, ללא שרת תמיד-פועל**:
+
+- **Vercel** – ממשק ה-Web Dashboard (הרצה ללא עלות)
+- **GitHub Actions** – הרצת בדיקות Playwright (ללא דקות על חשבון ב-repo ציבורי)
+- **Git** – שכבת האחסון (קובצי config, schedules, baselines, דוחות)
+
+## התקנה מקומית (פיתוח)
 
 ```bash
 npm install
 npx playwright install chromium
 ```
 
-## הגדרה
-
-ערוך את `config.json` או השתמש ב-Dashboard.
-
 ### CLI (מסוף)
 
 ```bash
-npm run baseline    # צילום בייסליין ראשוני
-npm run test        # הרצת בדיקה מול הבייסליין
+npm run baseline            # צילום בייסליין ראשוני
+npm run test                # הרצת בדיקה מול הבייסליין
+npm run crawl               # גילוי עמודים + צילום בייסליין (CRAWL_URL...)
+npm run run:scheduled       # הרצת לוחות זמנים שהגיע זמנם (מ-schedules.json)
 ```
 
-### Web Dashboard (ממשק גרפי)
+### Web Dashboard (מקומי)
 
 ```bash
-# בניית הממשק (פעם ראשונה)
 npm run build:client
-
-# הפעלת השרת
-npm run server
-# => http://localhost:3456
-
-# או במצב פיתוח (server + client יחד)
-npm run dev
+npm run server              # => http://localhost:3456
 ```
+
+## הגדרה
+
+ערוך את `config.json` או השתמש ב-Dashboard (מקומי או דרך Vercel).
 
 ## Dashboard Features
 
 | מסך | תיאור |
 |-----|--------|
 | **Dashboard** | תצוגת סיכום: כמות דפים, viewport, threshold, כמות דוחות |
-| **Pages** | ניהול דפים לבדיקה – הוספה, עריכה, מחיקה |
-| **Test Runner** | הרצת baseline או test, תצוגת תוצאות בזמן אמת |
+| **Pages** | ניהול דפים לבדיקה – הוספה, עריכה, מחיקה (עדכון baseline מוחק את ה-current/diffs של הדף) |
+| **Test Runner** | הרצת baseline / test / crawl – מופעלת כ-Job אסינכרוני ב-GitHub Actions ומעודכן מעצמו |
 | **Reports** | צפייה בדוחות קודמים, השוואת תמונות עם Slider |
+| **Schedules** | ניהול לוחות זמנים לריצה אוטומטית |
 
-## Diff Slider
+## איך זה עובד
 
-ב-Report Viewer ניתן ללחוץ על Compare כדי לפתוח את **Diff Slider** – משווה תמונות Baseline מול Current ע"י גרירה ימינה/שמאלה.
+1. ממשק ה-Vercel קורא/כותב קבצים (config.json, schedules.json, baselines, דוחות) ישירות ב-repo דרך GitHub API.
+2. ריצת בדיקה נקראת על ידי `workflow_dispatch` ל-GitHub Actions, או ע"י `schedule:` (כל 30 דקות) שבודק את `schedules.json`.
+3. ה-Workflow מריץ את Playwright ומחזיר את התוצאות (baselines / current / diffs / reports) בחזרה ל-git – כך הדוחות זמינים בממשק.
+4. **Cleanup** – כל יום ראשון 03:00 UTC מנקה קבצים זמניים (reports, current, diffs, crawl-results).
 
-## REST API
+## REST API (Vercel Functions)
 
 | Method | Endpoint | תפקיד |
 |--------|----------|-------|
-| `GET` | `/api/config` | קבלת הגדרות |
-| `PATCH` | `/api/config` | עדכון הגדרות |
-| `GET` | `/api/pages` | רשימת דפים |
-| `POST` | `/api/pages` | הוספת דף |
-| `PUT` | `/api/pages/:name` | עדכון דף |
-| `DELETE` | `/api/pages/:name` | מחיקת דף |
-| `POST` | `/api/run/baseline` | צילום בייסליין |
-| `POST` | `/api/run/test` | הרצת בדיקה |
+| `GET/PATCH` | `/api/config` | קבלת/עדכון הגדרות |
+| `GET/POST` | `/api/pages` | רשימת/הוספת דפים |
+| `PUT/DELETE` | `/api/pages?name=` | עדכון/מחיקת דף |
+| `POST` | `/api/dispatch` | שליחת job (test/baseline/crawl) ל-GitHub Actions |
+| `GET` | `/api/status` | מצב ריצות אחרונות |
+| `GET/POST` | `/api/schedules` | ניהול לוחות זמנים |
 | `GET` | `/api/reports` | רשימת דוחות |
-| `GET` | `/api/reports/:filename` | צפייה בדוח |
+| `GET` | `/api/files?type=&name=` | תמונות / דוחות מה-git |
+| `POST/GET` | `/api/crawl` | גילוי עמודים + אישור baselines |
 
-## פלט
+## פלט (בתוך ה-repo)
 
-- `baselines/` – צילומי המסך הבסיסיים
-- `current/` – צילומי המסך הנוכחיים
-- `diffs/` – תמונות הבדלים
-- `reports/` – דוחות HTML
+- `baselines/` – צילומי המסך הבסיסיים (נשמרים – לא נמחקים)
+- `current/` – צילומי המסך הנוכחיים (מתנקים שבועית)
+- `diffs/` – תמונות הבדלים (מתנקים שבועית)
+- `reports/` – דוחות HTML (מתנקים שבועית)
+- `crawl-results/` – תוצאות גלישה (מתנקים שבועית)
+
+## הגדרות סביבה (Vercel)
+
+| Variable | תיאור |
+|----------|--------|
+| `GITHUB_TOKEN` | Token עם הרשאות repo (קריאה/כתיבה `contents:write`) |
+| `GITHUB_REPO` | שם ה-repo, כברירת מחדל `benshoeff/visual-qa-agent` |
+| `GITHUB_BRANCH` | ענף ברירת מחדל, כברירת מחדל `main` |

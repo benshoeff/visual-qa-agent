@@ -1,9 +1,10 @@
 {
-  "installCommand": "npm install --prefix client",
-  "buildCommand": "cd client && npm run build",
+  "installCommand": "npm install --ignore-scripts && npm install --prefix client",
+  "buildCommand": "npm run build --prefix client",
   "outputDirectory": "client/dist",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://visual-qa-agent.onrender.com/api/$1" },
-    { "source": "/images/(.*)", "destination": "https://visual-qa-agent.onrender.com/images/$1" }
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/images/:type/:name", "destination": "/api/files?type=:type&name=:name" },
+    { "source": "/((?!api).*)", "destination": "/index.html" }
   ]
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getPages, addPage, updatePage, deletePage, runPageBaseline, runPageTest, getImageUrl } from '../api'
+import { getPages, addPage, updatePage, deletePage, dispatchRun, getImageUrl } from '../api'
 import type { PageConfig, CompareResult } from '../api'
 
 const emptyPage = (): PageConfig => ({
@@ -74,11 +74,13 @@ export default function PagesManager() {
     setLoadingPages((prev) => ({ ...prev, [name]: 'baseline' }))
     setError('')
     try {
-      await runPageBaseline(name)
+      await dispatchRun('baseline', { pages: [name] })
+      await new Promise((r) => setTimeout(r, 15000))
+      setLoadingPages((prev) => ({ ...prev, [name]: null }))
+      await refresh()
       setRefreshKey((k) => k + 1)
     } catch (e) {
       setError((e as Error).message)
-    } finally {
       setLoadingPages((prev) => ({ ...prev, [name]: null }))
     }
   }
@@ -87,12 +89,13 @@ export default function PagesManager() {
     setLoadingPages((prev) => ({ ...prev, [name]: 'test' }))
     setError('')
     try {
-      const { result } = await runPageTest(name)
-      setPageResults((prev) => ({ ...prev, [name]: result }))
+      await dispatchRun('test', { pages: [name] })
+      await new Promise((r) => setTimeout(r, 15000))
+      setLoadingPages((prev) => ({ ...prev, [name]: null }))
+      await refresh()
       setRefreshKey((k) => k + 1)
     } catch (e) {
       setError((e as Error).message)
-    } finally {
       setLoadingPages((prev) => ({ ...prev, [name]: null }))
     }
   }

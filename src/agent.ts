@@ -380,11 +380,15 @@ async function main() {
   const mode = modeArg?.split("=")[1] ?? "test";
 
   const config = readConfig();
+  const pagesEnv = process.env.PAGES;
+  const pageNames = pagesEnv && pagesEnv.trim() !== "" && pagesEnv !== "all"
+    ? pagesEnv.split(",").map((s) => s.trim()).filter(Boolean)
+    : undefined;
 
   if (mode === "baseline") {
-    await runBaseline(config);
+    await runBaseline(config, pageNames);
   } else if (mode === "test") {
-    const results = await runTest(config);
+    const results = await runTest(config, pageNames);
     const failed = results.filter((r) => !r.passed).length;
     if (failed > 0) process.exit(1);
   } else {
