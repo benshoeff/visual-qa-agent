@@ -4,7 +4,7 @@ import {
   commitFiles,
   dispatchWorkflow,
   corsHeaders,
-} from "../serverless/github";
+} from "./_lib/github";
 
 interface DiscoveredPage {
   url: string;

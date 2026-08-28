@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getFileText, commitFiles, corsHeaders } from "../serverless/github";
+import { getFileText, commitFiles, corsHeaders } from "./_lib/github";
 
 // Reflects the Schedule type from the serverless workflow consumer.
 interface Schedule {
