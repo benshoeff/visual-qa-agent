@@ -2,6 +2,11 @@
   "installCommand": "npm install --ignore-scripts && npm install --prefix client",
   "buildCommand": "npm run build --prefix client",
   "outputDirectory": "client/dist",
+  "functions": {
+    "api/*.ts": {
+      "includeFiles": "api/_lib/**"
+    }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/images/:type/:name", "destination": "/api/files?type=:type&name=:name" },
