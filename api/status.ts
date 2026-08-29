@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getLatestRuns, getFileText, corsHeaders } from "./_lib/github";
+import { getLatestRuns, getFileText, corsHeaders } from "./lib/github";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") {

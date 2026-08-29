@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getFileText, commitFiles, corsHeaders } from "./_lib/github";
+import { getFileText, commitFiles, corsHeaders } from "./lib/github";
 
 interface PageConfig {
   name: string;

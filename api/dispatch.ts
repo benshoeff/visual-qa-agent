@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { dispatchWorkflow, getLatestRuns, corsHeaders } from "./_lib/github";
+import { dispatchWorkflow, getLatestRuns, corsHeaders } from "./lib/github";
 
 interface DispatchInput {
   mode: "test" | "baseline" | "crawl";

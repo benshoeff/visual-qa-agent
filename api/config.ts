@@ -3,7 +3,7 @@ import {
   getFileText,
   commitFiles,
   corsHeaders,
-} from "./_lib/github";
+} from "./lib/github";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") {

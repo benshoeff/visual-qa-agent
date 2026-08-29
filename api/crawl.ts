@@ -4,7 +4,7 @@ import {
   commitFiles,
   dispatchWorkflow,
   corsHeaders,
-} from "./_lib/github";
+} from "./lib/github";
 
 interface DiscoveredPage {
   url: string;
