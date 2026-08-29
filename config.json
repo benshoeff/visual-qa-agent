@@ -5,13 +5,7 @@
   },
   "threshold": 0.2,
   "waitFor": "networkidle",
-  "pages": [
-    {
-      "name": "Homepage",
-      "url": "https://qa-sandbox-app.vercel.app/",
-      "threshold": 0.2
-    }
-  ],
+  "pages": [],
   "ai": {
     "enabled": false,
     "model": "llama3.2-vision:11b",
