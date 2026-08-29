@@ -1,28 +1,81 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  AlertTriangle,
+  Loader2,
+  Plus,
+  Pencil,
+  Trash2,
+  Camera,
+  Play,
+} from 'lucide-react'
+import { toast } from 'sonner'
 import { getPages, addPage, updatePage, deletePage, dispatchRun, getImageUrl } from '../api'
-import type { PageConfig, CompareResult } from '../api'
+import type { PageConfig } from '../api'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 
-const emptyPage = (): PageConfig => ({
-  name: '',
-  url: '',
-})
+const emptyPage = (): PageConfig => ({ name: '', url: '' })
+
+type LoadingState = Record<string, 'baseline' | 'test' | null>
+
+function PageThumbnail({ name, refreshKey }: { name: string; refreshKey: number }) {
+  const [hidden, setHidden] = useState(false)
+  const url = `${getImageUrl('baseline', name)}&t=${refreshKey}`
+
+  return hidden ? (
+    <div className="flex size-[60px] items-center justify-center rounded-md border bg-muted text-[10px] text-muted-foreground">
+      No shot
+    </div>
+  ) : (
+    <img
+      src={url}
+      alt={name}
+      className="size-[60px] rounded-md border object-cover"
+      onError={() => setHidden(true)}
+    />
+  )
+}
 
 export default function PagesManager() {
   const [pages, setPages] = useState<PageConfig[]>([])
   const [editing, setEditing] = useState<PageConfig | null>(null)
   const [isNew, setIsNew] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<PageConfig | null>(null)
   const [error, setError] = useState('')
-  const [loadingPages, setLoadingPages] = useState<Record<string, 'baseline' | 'test' | null>>({})
-  const [pageResults, setPageResults] = useState<Record<string, CompareResult | null>>({})
+  const [loadingPages, setLoadingPages] = useState<LoadingState>({})
   const [refreshKey, setRefreshKey] = useState(0)
-  const [previewImage, setPreviewImage] = useState<string | null>(null)
   const [originalName, setOriginalName] = useState<string | null>(null)
 
+  const refresh = useCallback(() => getPages().then(setPages), [])
+
   useEffect(() => {
-    getPages().then(setPages).catch((e) => setError(e.message))
+    getPages().then(setPages).catch(() => toast.error('Failed to load pages'))
   }, [])
 
-  const refresh = () => getPages().then(setPages)
+  const closeEditor = () => {
+    setEditing(null)
+    setOriginalName(null)
+    setIsNew(false)
+    setError('')
+  }
 
   const handleSave = async () => {
     if (!editing) return
@@ -34,25 +87,28 @@ export default function PagesManager() {
     try {
       if (isNew) {
         await addPage(editing)
+        toast.success(`Page "${editing.name}" added`)
       } else {
         await updatePage(originalName!, editing)
+        toast.success(`Page "${editing.name}" updated`)
       }
-      setEditing(null)
-      setOriginalName(null)
-      setIsNew(false)
+      closeEditor()
       await refresh()
     } catch (e) {
       setError((e as Error).message)
     }
   }
 
-  const handleDelete = async (name: string) => {
-    if (!confirm(`Delete page "${name}"?`)) return
+  const handleDelete = async () => {
+    if (!deleteTarget) return
     try {
-      await deletePage(name)
+      await deletePage(deleteTarget.name)
+      toast.success(`Page "${deleteTarget.name}" deleted`)
+      setDeleteTarget(null)
       await refresh()
     } catch (e) {
-      setError((e as Error).message)
+      toast.error((e as Error).message)
+      setDeleteTarget(null)
     }
   }
 
@@ -70,215 +126,238 @@ export default function PagesManager() {
     setError('')
   }
 
-  const handlePageBaseline = async (name: string) => {
-    setLoadingPages((prev) => ({ ...prev, [name]: 'baseline' }))
+  const runForPage = async (name: string, mode: 'baseline' | 'test') => {
+    setLoadingPages((prev) => ({ ...prev, [name]: mode }))
     setError('')
     try {
-      await dispatchRun('baseline', { pages: [name] })
+      await dispatchRun(mode, { pages: [name] })
       await new Promise((r) => setTimeout(r, 15000))
-      setLoadingPages((prev) => ({ ...prev, [name]: null }))
       await refresh()
       setRefreshKey((k) => k + 1)
+      toast.success(mode === 'baseline' ? 'Baseline captured' : 'Test completed')
     } catch (e) {
-      setError((e as Error).message)
-      setLoadingPages((prev) => ({ ...prev, [name]: null }))
-    }
-  }
-
-  const handlePageTest = async (name: string) => {
-    setLoadingPages((prev) => ({ ...prev, [name]: 'test' }))
-    setError('')
-    try {
-      await dispatchRun('test', { pages: [name] })
-      await new Promise((r) => setTimeout(r, 15000))
-      setLoadingPages((prev) => ({ ...prev, [name]: null }))
-      await refresh()
-      setRefreshKey((k) => k + 1)
-    } catch (e) {
-      setError((e as Error).message)
+      toast.error((e as Error).message)
+    } finally {
       setLoadingPages((prev) => ({ ...prev, [name]: null }))
     }
   }
 
   return (
-    <div>
-      <div className="section-header">
-        <h1>Pages</h1>
-        <button className="btn btn-primary" onClick={startNew}>
-          + Add Page
-        </button>
-      </div>
+    <div className="space-y-6">
+      <header className="flex items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Pages</h1>
+          <p className="text-sm text-muted-foreground">
+            Pages under visual regression monitoring.
+          </p>
+        </div>
+        <Button onClick={startNew}>
+          <Plus /> Add Page
+        </Button>
+      </header>
 
-      {error && <div className="error-banner">{error}</div>}
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          <AlertTriangle className="size-4" /> {error}
+        </div>
+      )}
 
-      {editing && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h2>{isNew ? 'Add Page' : 'Edit Page'}</h2>
-              <button className="modal-x" onClick={() => { setEditing(null); setOriginalName(null); setIsNew(false); setError('') }}>&times;</button>
-            </div>
-            <label>
-              Name
-              <input
-                value={editing.name}
-                onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+      {pages.length === 0 && !error ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-20 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
+            <Plus className="size-6 text-primary" />
+          </div>
+          <p className="text-sm font-medium">No pages configured yet</p>
+          <p className="text-sm text-muted-foreground">
+            Click “Add Page” to start monitoring a URL.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-[76px]">Preview</TableHead>
+                <TableHead className="w-[160px]">Name</TableHead>
+                <TableHead>URL</TableHead>
+                <TableHead className="w-[90px]">Threshold</TableHead>
+                <TableHead className="w-[300px] text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pages.map((p) => {
+                const loading = loadingPages[p.name]
+                return (
+                  <TableRow key={p.name}>
+                    <TableCell>
+                      <PageThumbnail name={p.name} refreshKey={refreshKey} />
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium">{p.name}</span>
+                    </TableCell>
+                    <TableCell>
+                      <a
+                        href={p.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="max-w-[320px] truncate text-primary hover:underline"
+                        title={p.url}
+                      >
+                        {p.url}
+                      </a>
+                    </TableCell>
+                    <TableCell>
+                      {p.threshold != null ? (
+                        <Badge variant="outline">{p.threshold}%</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={loading != null}
+                          onClick={() => runForPage(p.name, 'baseline')}
+                        >
+                          {loading === 'baseline' ? (
+                            <Loader2 className="animate-spin" />
+                          ) : (
+                            <Camera />
+                          )}
+                          {loading === 'baseline' ? 'Capturing…' : 'Baseline'}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={loading != null}
+                          onClick={() => runForPage(p.name, 'test')}
+                        >
+                          {loading === 'test' ? (
+                            <Loader2 className="animate-spin" />
+                          ) : (
+                            <Play />
+                          )}
+                          {loading === 'test' ? 'Running…' : 'Test'}
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => startEdit(p)} aria-label={`Edit ${p.name}`}>
+                          <Pencil />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => setDeleteTarget(p)}
+                          aria-label={`Delete ${p.name}`}
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Add / Edit dialog */}
+      <Dialog open={editing != null} onOpenChange={(o) => !o && closeEditor()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isNew ? 'Add Page' : 'Edit Page'}</DialogTitle>
+            <DialogDescription>
+              {isNew
+                ? 'Add a URL to start monitoring.'
+                : 'Update the page details.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="page-name">Name</Label>
+              <Input
+                id="page-name"
+                value={editing?.name ?? ''}
+                onChange={(e) => setEditing((prev) => prev && { ...prev, name: e.target.value })}
                 placeholder="homepage"
               />
-            </label>
-            <label>
-              URL
-              <input
-                value={editing.url}
-                onChange={(e) => setEditing({ ...editing, url: e.target.value })}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="page-url">URL</Label>
+              <Input
+                id="page-url"
+                value={editing?.url ?? ''}
+                onChange={(e) => setEditing((prev) => prev && { ...prev, url: e.target.value })}
                 placeholder="https://example.com"
               />
-            </label>
-            <label>
-              Threshold % (optional — overrides global)
-              <input
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="page-threshold">
+                Threshold % <span className="font-normal text-muted-foreground">(optional — overrides global)</span>
+              </Label>
+              <Input
+                id="page-threshold"
                 type="number"
                 min="0"
                 max="100"
                 step="0.1"
-                value={editing.threshold ?? ''}
+                value={editing?.threshold ?? ''}
                 onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    threshold: e.target.value ? parseFloat(e.target.value) : undefined,
-                  })
+                  setEditing((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          threshold: e.target.value
+                            ? parseFloat(e.target.value)
+                            : undefined,
+                        }
+                      : null
+                  )
                 }
                 placeholder="e.g. 5"
               />
-            </label>
-            <div className="modal-actions">
-              <button className="btn btn-primary" onClick={handleSave}>
-                {isNew ? 'Add' : 'Save'}
-              </button>
-              <button className="btn btn-secondary" onClick={() => { setEditing(null); setOriginalName(null); setIsNew(false); setError('') }}>
-                Cancel
-              </button>
             </div>
+            {error && (
+              <p className="flex items-center gap-2 text-sm text-destructive">
+                <AlertTriangle className="size-4" /> {error}
+              </p>
+            )}
           </div>
-        </div>
-      )}
 
-      <div className="wrapper">
-      <table className="table pages-table">
-        <thead>
-          <tr>
-            <th>Preview</th>
-            <th>Name</th>
-            <th>URL</th>
-            <th>Threshold</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pages.length === 0 && (
-            <tr>
-                <td colSpan={5} className="empty">
-                No pages configured yet. Click "Add Page" to get started.
-              </td>
-            </tr>
-          )}
-          {pages.map((p) => {
-            const loading = loadingPages[p.name]
-            const result = pageResults[p.name]
-            const rowClass = result
-              ? result.error
-                ? 'row-error'
-                : result.passed
-                  ? 'row-pass'
-                  : 'row-fail'
-              : ''
-            return (
-              <tr key={p.name} className={rowClass}>
-                <td>
-                  <img
-                    className="page-thumbnail"
-                    src={`${getImageUrl('baseline', p.name)}&t=${refreshKey}`}
-                    alt={p.name}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setPreviewImage(getImageUrl('baseline', p.name))}
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = 'none'
-                    }}
-                  />
-                </td>
-                <td>
-                  <strong>{p.name}</strong>
-                  {result && !result.error && (
-                    <span className={`page-status ${result.passed ? 'status-pass' : 'status-fail'}`}>
-                      {result.passed ? ' ✓' : ` ✗ ${result.diffPercent}%`}
-                    </span>
-                  )}
-                  {result?.error && (
-                    <span className="page-status status-error"> ⚠</span>
-                  )}
-                </td>
-                <td className="url-cell">
-                  <span className="url-tooltip" data-url={p.url}>
-                    <a href={p.url} target="_blank" rel="noreferrer">
-                      {p.url}
-                    </a>
-                  </span>
-                </td>
-                <td>{p.threshold != null ? `${p.threshold}%` : '—'}</td>
-                <td className="actions-cell">
-                  <div className="actions-flex">
-                    <button
-                    className="btn btn-sm btn-accent"
-                    disabled={loading != null}
-                    onClick={() => handlePageBaseline(p.name)}
-                  >
-                    {loading === 'baseline' ? <span className="btn-spinner" /> : null}
-                    {loading === 'baseline' ? 'Capturing...' : 'Capture Baseline'}
-                  </button>
-                  <button
-                    className="btn btn-sm btn-primary"
-                    disabled={loading != null}
-                    onClick={() => handlePageTest(p.name)}
-                  >
-                    {loading === 'test' ? <span className="btn-spinner" /> : null}
-                    {loading === 'test' ? 'Running...' : 'Run Test'}
-                  </button>
-                  <button className="btn btn-sm" onClick={() => startEdit(p)}>
-                    Edit
-                  </button>
-                  <button className="btn btn-sm btn-danger" onClick={() => handleDelete(p.name)}>
-                    Delete
-                  </button>
-                  </div>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeEditor}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>{isNew ? 'Add' : 'Save'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {Object.values(pageResults).some((r) => r && !r.error && !r.passed) && (
-        <div className="section">
-          <h2>Failed Pages Detail</h2>
-          {Object.entries(pageResults)
-            .filter(([, r]) => r && !r.error && !r.passed)
-            .map(([name, r]) => (
-              <div key={name} className="result-card result-card-fail">
-                <strong>{name}</strong> — Diff: {r!.diffPercent}% ({r!.diffPixels} px)
-              </div>
-            ))}
-        </div>
-      )}
-
-      {previewImage && (
-        <div className="modal-overlay" onClick={() => setPreviewImage(null)}>
-          <div className="lightbox" onClick={(e) => e.stopPropagation()}>
-            <button className="lightbox-close" onClick={() => setPreviewImage(null)}>&times;</button>
-            <img src={previewImage} alt="Preview" className="lightbox-image" />
-          </div>
-        </div>
-      )}
+      {/* Delete confirm dialog */}
+      <Dialog open={deleteTarget != null} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="size-4 text-destructive" /> Delete page?
+            </DialogTitle>
+            <DialogDescription>
+              “{deleteTarget?.name}” and its baselines / diffs will be removed. This
+              action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

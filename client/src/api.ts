@@ -113,15 +113,15 @@ export async function getRunStatus(): Promise<RunStatus[]> {
 
 const WAIT_FOR_STATES = ['queued', 'in_progress', 'pending', 'requested', 'waiting']
 
-export function isRunPending(r: RunStatus | undefined): boolean {
+export function isRunPending(r: RunStatus | undefined | null): boolean {
   return !!r && WAIT_FOR_STATES.includes(r.status)
 }
 
-export function isRunDone(r: RunStatus | undefined): boolean {
+export function isRunDone(r: RunStatus | undefined | null): boolean {
   return !!r && !WAIT_FOR_STATES.includes(r.status)
 }
 
-export function runConclusion(r: RunStatus | undefined): 'success' | 'neutral' | 'skipped' | 'cancelled' | 'timed_out' | 'action_required' | 'failure' | 'startup_failure' | 'stale' | null {
+export function runConclusion(r: RunStatus | undefined | null): 'success' | 'neutral' | 'skipped' | 'cancelled' | 'timed_out' | 'action_required' | 'failure' | 'startup_failure' | 'stale' | null {
   return r?.status === 'completed' && r.conclusion ? (r.conclusion as never) : null
 }
 
