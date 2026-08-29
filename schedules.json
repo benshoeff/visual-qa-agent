@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "id": "4a08e507-68e6-449d-a165-431d27a1522a",
+    "name": "Nightly run",
+    "cronExpression": "0 9 * * *",
+    "mode": "test",
+    "enabled": true,
+    "createdAt": 1788019197440,
+    "lastRun": null
+  }
+]
