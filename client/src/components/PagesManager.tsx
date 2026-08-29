@@ -197,7 +197,7 @@ export default function PagesManager() {
                 <td>
                   <img
                     className="page-thumbnail"
-                    src={`${getImageUrl('baseline', p.name)}?t=${refreshKey}`}
+                    src={`${getImageUrl('baseline', p.name)}&t=${refreshKey}`}
                     alt={p.name}
                     style={{ cursor: 'pointer' }}
                     onClick={() => setPreviewImage(getImageUrl('baseline', p.name))}
