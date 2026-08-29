@@ -1,0 +1,104 @@
+{
+  "id": "55ebcd9f-1d2c-4cfa-8b6d-294e1da775ad",
+  "status": "completed",
+  "startUrl": "https://qa-sandbox-app.vercel.app/",
+  "discoveredPages": [
+    {
+      "url": "https://qa-sandbox-app.vercel.app/",
+      "name": "homepage",
+      "depth": 0
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/users",
+      "name": "users",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/roles",
+      "name": "roles",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/permissions",
+      "name": "permissions",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/products",
+      "name": "products",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/categories",
+      "name": "categories",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/posts",
+      "name": "posts",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/tasks",
+      "name": "tasks",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/orders",
+      "name": "orders",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/customers",
+      "name": "customers",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/invoices",
+      "name": "invoices",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/tickets",
+      "name": "tickets",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/projects",
+      "name": "projects",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/reviews",
+      "name": "reviews",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/employees",
+      "name": "employees",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    },
+    {
+      "url": "https://qa-sandbox-app.vercel.app/departments",
+      "name": "departments",
+      "depth": 1,
+      "parentUrl": "https://qa-sandbox-app.vercel.app/"
+    }
+  ],
+  "createdAt": "2026-08-29T11:23:12.792Z",
+  "updatedAt": "2026-08-29T11:23:33.222Z"
+}
