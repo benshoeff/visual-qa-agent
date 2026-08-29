@@ -34,5 +34,5 @@ jobs:
             echo "Nothing to clean"
           else
             git commit -m "chore(visual-qa): weekly cleanup of temporary files [skip ci]"
-            git push origin main
+            git push origin HEAD:$GITHUB_REF_NAME
           fi
