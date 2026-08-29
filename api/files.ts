@@ -38,14 +38,22 @@ interface GitContent {
   type?: string;
 }
 
+async function getRawContent(path: string): Promise<string | null> {
+  const data = await gh<GitContent>(`/repos/${repo()}/contents/${path}?ref=${branch()}`);
+  if (data.content) return Buffer.from(data.content, "base64").toString("utf-8");
+  // Files larger than 1MB: contents API returns empty content. Fetch the blob directly.
+  if (data.sha) {
+    const blob = await gh<GitContent>(`/repos/${repo()}/git/blobs/${data.sha}`);
+    if (blob.content) return Buffer.from(blob.content, "base64").toString("utf-8");
+  }
+  return null;
+}
+
 async function getFileText(path: string): Promise<{ content: string; sha?: string } | null> {
   try {
-    const data = await gh<GitContent>(`/repos/${repo()}/contents/${path}?ref=${branch()}`);
-    if (!data.content) return null;
-    return {
-      content: Buffer.from(data.content, "base64").toString("utf-8"),
-      sha: data.sha,
-    };
+    const content = await getRawContent(path);
+    if (content === null) return null;
+    return { content, sha: undefined };
   } catch (err) {
     if ((err as Error).message.includes("404")) return null;
     throw err;
@@ -54,9 +62,9 @@ async function getFileText(path: string): Promise<{ content: string; sha?: strin
 
 async function getFileBuffer(path: string): Promise<Buffer | null> {
   try {
-    const data = await gh<GitContent>(`/repos/${repo()}/contents/${path}?ref=${branch()}`);
-    if (!data.content) return null;
-    return Buffer.from(data.content, "base64");
+    const content = await getRawContent(path);
+    if (content === null) return null;
+    return Buffer.from(content, "utf-8");
   } catch (err) {
     if ((err as Error).message.includes("404")) return null;
     throw err;
