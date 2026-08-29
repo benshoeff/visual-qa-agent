@@ -139,7 +139,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   try {
     // POST /api/crawl -> dispatch crawl workflow
-    if (req.method === "POST") {
+    if (req.method === "POST" && req.query.confirm !== "true") {
       const { url, config, autoCaptureBaseline } = req.body ?? {};
       if (!url) {
         res.status(400).setHeaders(corsHeaders()).json({ error: "url is required" });

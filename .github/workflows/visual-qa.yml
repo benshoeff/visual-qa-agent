@@ -101,7 +101,7 @@ jobs:
         run: rm -f current/*.png diffs/*.png || true
 
       - name: Commit results back to git
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         run: |
           git config user.name "visual-qa-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -110,5 +110,5 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore(visual-qa): update test artifacts [skip ci]"
-            git push origin main
+            git push origin HEAD:$GITHUB_REF_NAME
           fi
