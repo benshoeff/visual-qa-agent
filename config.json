@@ -20,12 +20,6 @@
       "url": "https://qa-sandbox-app.vercel.app/orders",
       "mask": [],
       "threshold": 0.2
-    },
-    {
-      "name": "roles",
-      "url": "https://qa-sandbox-app.vercel.app/roles",
-      "mask": [],
-      "threshold": 0.2
     }
   ],
   "ai": {
