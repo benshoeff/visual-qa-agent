@@ -28,12 +28,6 @@
       "threshold": 0.2
     },
     {
-      "name": "products",
-      "url": "https://qa-sandbox-app.vercel.app/products",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
       "name": "roles",
       "url": "https://qa-sandbox-app.vercel.app/roles",
       "mask": [],
