@@ -5,7 +5,104 @@
   },
   "threshold": 0.2,
   "waitFor": "networkidle",
-  "pages": [],
+  "pages": [
+    {
+      "name": "homepage",
+      "url": "https://qa-sandbox-app.vercel.app/",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "users",
+      "url": "https://qa-sandbox-app.vercel.app/users",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "roles",
+      "url": "https://qa-sandbox-app.vercel.app/roles",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "permissions",
+      "url": "https://qa-sandbox-app.vercel.app/permissions",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "products",
+      "url": "https://qa-sandbox-app.vercel.app/products",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "categories",
+      "url": "https://qa-sandbox-app.vercel.app/categories",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "posts",
+      "url": "https://qa-sandbox-app.vercel.app/posts",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "tasks",
+      "url": "https://qa-sandbox-app.vercel.app/tasks",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "orders",
+      "url": "https://qa-sandbox-app.vercel.app/orders",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "customers",
+      "url": "https://qa-sandbox-app.vercel.app/customers",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "invoices",
+      "url": "https://qa-sandbox-app.vercel.app/invoices",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "tickets",
+      "url": "https://qa-sandbox-app.vercel.app/tickets",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "projects",
+      "url": "https://qa-sandbox-app.vercel.app/projects",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "reviews",
+      "url": "https://qa-sandbox-app.vercel.app/reviews",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "employees",
+      "url": "https://qa-sandbox-app.vercel.app/employees",
+      "mask": [],
+      "threshold": 0.2
+    },
+    {
+      "name": "departments",
+      "url": "https://qa-sandbox-app.vercel.app/departments",
+      "mask": [],
+      "threshold": 0.2
+    }
+  ],
   "ai": {
     "enabled": false,
     "model": "llama3.2-vision:11b",
