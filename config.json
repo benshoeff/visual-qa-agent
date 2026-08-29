@@ -10,10 +10,6 @@
       "name": "Homepage",
       "url": "https://qa-sandbox-app.vercel.app/",
       "threshold": 0.2
-    },
-    {
-      "name": "Users",
-      "url": "https://qa-sandbox-app.vercel.app/users"
     }
   ],
   "ai": {
