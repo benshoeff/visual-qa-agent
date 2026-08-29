@@ -1,6 +1,23 @@
 import { useState, useEffect, useRef } from 'react'
+import {
+  Camera,
+  Loader2,
+  Play,
+  CheckCircle2,
+  XCircle,
+  ExternalLink,
+  FileBarChart2,
+  CheckSquare,
+  Square,
+} from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { getPages, dispatchRun, getRunStatus, isRunPending, runConclusion } from '../api'
 import type { PageConfig, RunStatus } from '../api'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 export default function TestRunner() {
   const [loading, setLoading] = useState<'baseline' | 'test' | null>(null)
@@ -11,7 +28,7 @@ export default function TestRunner() {
   const polling = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    getPages().then(setPages)
+    getPages().then(setPages).catch(() => {})
     getRunStatus().then((runs) => setRunStatus(runs[0] ?? null)).catch(() => {})
   }, [])
 
@@ -50,32 +67,19 @@ export default function TestRunner() {
   const allSelected = pages.length > 0 && selectedPages.size === pages.length
 
   const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedPages(new Set())
-    } else {
-      setSelectedPages(new Set(pages.map((p) => p.name)))
-    }
+    setSelectedPages(allSelected ? new Set() : new Set(pages.map((p) => p.name)))
   }
 
   const togglePage = (name: string) => {
     const next = new Set(selectedPages)
-    if (next.has(name)) {
-      next.delete(name)
-    } else {
-      next.add(name)
-    }
+    if (next.has(name)) next.delete(name)
+    else next.add(name)
     setSelectedPages(next)
   }
 
-  const getSelectedNames = () => {
-    const names = [...selectedPages]
-    if (names.length === 0) return undefined
-    return names
-  }
-
   const handleRun = async (mode: 'baseline' | 'test') => {
-    const names = getSelectedNames()
-    if (!names || names.length === 0) {
+    const names = [...selectedPages]
+    if (names.length === 0) {
       setError('Select at least one page to run')
       return
     }
@@ -92,99 +96,162 @@ export default function TestRunner() {
   }
 
   const conclusion = runConclusion(runStatus)
+  const pending = isRunPending(runStatus)
 
   return (
-    <div>
-      <h1>Test Runner</h1>
-      <div className="card-header-note">
-        Runs are executed in GitHub Actions and will appear below once started.
-      </div>
+    <div className="space-y-6">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Test Runner</h1>
+        <p className="text-sm text-muted-foreground">
+          Runs are executed in GitHub Actions and will appear below once started.
+        </p>
+      </header>
 
-      <div className="section">
-        <h2>Select Pages</h2>
-        <div className="page-checklist">
-          <label className="page-checkbox page-checkbox-all">
-            <input
-              type="checkbox"
-              checked={allSelected}
-              onChange={toggleSelectAll}
-            />
-            <span>Select All ({pages.length})</span>
-          </label>
-          {pages.map((p) => (
-            <label key={p.name} className="page-checkbox">
-              <input
-                type="checkbox"
-                checked={selectedPages.has(p.name)}
-                onChange={() => togglePage(p.name)}
-              />
-              <span className="page-checkbox-name">{p.name}</span>
-              <span className="page-checkbox-url">{p.url}</span>
-            </label>
-          ))}
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Select Pages</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {pages.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No pages configured yet.{' '}
+              <Link to="/pages" className="text-primary hover:underline">
+                Add pages
+              </Link>{' '}
+              to run tests.
+            </p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border">
+              <label className="flex cursor-pointer items-center gap-3 border-b bg-muted/40 px-4 py-3 hover:bg-muted/60">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleSelectAll}
+                  className="size-4 accent-[var(--primary)]"
+                />
+                <span className="text-sm font-medium">
+                  Select All ({pages.length})
+                </span>
+                {allSelected ? (
+                  <CheckSquare className="ml-auto size-4 text-primary" />
+                ) : (
+                  <Square className="ml-auto size-4 text-muted-foreground" />
+                )}
+              </label>
+              <div className="max-h-[320px] divide-y overflow-y-auto">
+                {pages.map((p) => (
+                  <label
+                    key={p.name}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50',
+                      selectedPages.has(p.name) && 'bg-primary/5'
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedPages.has(p.name)}
+                      onChange={() => togglePage(p.name)}
+                      className="size-4 accent-[var(--primary)]"
+                    />
+                    <span className="min-w-0 text-sm font-medium">{p.name}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                      {p.url}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-      <div className="section">
-        <div className="action-buttons">
-          <button
-            className="btn btn-primary"
+      <Card>
+        <CardContent className="flex flex-wrap items-center gap-3 py-5">
+          <Button
             onClick={() => handleRun('baseline')}
             disabled={loading !== null || selectedPages.size === 0}
           >
-            {loading === 'baseline' ? '⏳ Capturing...' : '📸 Capture Baseline'}
-          </button>
-          <button
-            className="btn btn-accent"
+            {loading === 'baseline' ? <Loader2 className="animate-spin" /> : <Camera />}
+            {loading === 'baseline' ? 'Capturing…' : 'Capture Baseline'}
+          </Button>
+          <Button
+            variant="secondary"
             onClick={() => handleRun('test')}
             disabled={loading !== null || selectedPages.size === 0}
           >
-            {loading === 'test' ? '⏳ Running...' : '🔍 Run Tests'}
-          </button>
-        </div>
-        {selectedPages.size === 0 && (
-          <div className="hint">Select at least one page to run</div>
-        )}
-        {loading && (
-          <div className="loader">
-            <div className="spinner" />
-            <span>
-              {loading === 'baseline' ? 'Capturing baseline screenshots...' : 'Running visual tests...'} This can take a few minutes.
-            </span>
-          </div>
-        )}
-      </div>
+            {loading === 'test' ? <Loader2 className="animate-spin" /> : <Play />}
+            {loading === 'test' ? 'Running…' : 'Run Tests'}
+          </Button>
+          {selectedPages.size === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Select at least one page to run.
+            </p>
+          )}
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              {loading === 'baseline'
+                ? 'Capturing baseline screenshots…'
+                : 'Running visual tests…'}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-      {error && <div className="error-banner">{error}</div>}
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          <XCircle className="size-4" /> {error}
+        </div>
+      )}
 
       {runStatus && (
-        <div className="section">
-          <h2>Latest Run</h2>
-          <div className="result-card">
-            <div>
-              <strong>Run #{runStatus.runNumber}</strong> —{' '}
-              {isRunPending(runStatus) ? (
-                <span className="status-pending">⏳ Running…</span>
-              ) : (
-                <span className={conclusion === 'success' ? 'status-pass' : 'status-fail'}>
-                  {conclusion === 'success' ? '✅ Completed successfully' : `❌ ${runStatus.conclusion ?? 'failed'}`}
-                </span>
-              )}
-            </div>
-            <div>
-              <a href={runStatus.htmlUrl} target="_blank" rel="noreferrer" className="btn btn-sm">
-                View Run Logs ↗
-              </a>
-              &nbsp;
-              <a href="/reports" className="btn btn-sm">
-                📋 View Reports
-              </a>
-            </div>
-            {isRunPending(runStatus) && (
-              <div className="hint">Polling for completion every 15s...</div>
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle>Latest Run</CardTitle>
+            {pending ? (
+              <Badge variant="warning">
+                <Loader2 className="size-3 animate-spin" /> Running
+              </Badge>
+            ) : conclusion === 'success' ? (
+              <Badge variant="success">
+                <CheckCircle2 /> Success
+              </Badge>
+            ) : (
+              <Badge variant="destructive">
+                <XCircle /> <span className="capitalize">{runStatus.conclusion ?? 'failed'}</span>
+              </Badge>
             )}
-          </div>
-        </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-sm">
+              <span className="font-medium">Run #{runStatus.runNumber}</span>
+              <span className="text-muted-foreground">
+                {' '}
+                · {new Date(runStatus.createdAt).toLocaleString('en-US')}
+              </span>
+            </div>
+            {pending && (
+              <div className="flex items-center gap-3">
+                <Progress value={45} className="flex-1" />
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  Polling every 15s…
+                </span>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <a href={runStatus.htmlUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink /> View Run Logs
+                </a>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/reports">
+                  <FileBarChart2 /> View Reports
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

@@ -1,6 +1,51 @@
 import { useEffect, useRef, useState } from 'react'
+import { FileText, Monitor, Target, ClipboardList, Play, Settings2, FileBarChart2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { getConfig, getReports, updateConfig } from '../api'
 import type { Config } from '../api'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
+
+interface StatCardProps {
+  icon: React.ComponentType<{ className?: string }>
+  value: React.ReactNode
+  label: string
+  className?: string
+  onClick?: () => void
+  role?: string
+  tabIndex?: number
+  onKeyDown?: (e: React.KeyboardEvent) => void
+  ariaLabel?: string
+}
+
+function StatCard({ icon: Icon, value, label, className, ...editable }: StatCardProps) {
+  return (
+    <Card
+      className={cn(
+        'flex-row items-center gap-4 p-5',
+        editable.onClick && 'cursor-pointer card-lift',
+        className
+      )}
+      onClick={editable.onClick}
+      role={editable.role}
+      tabIndex={editable.tabIndex}
+      onKeyDown={editable.onKeyDown}
+      aria-label={editable.ariaLabel}
+    >
+      <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+        <Icon className="size-6 text-primary" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-2xl font-bold tracking-tight">{value}</div>
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </div>
+      </div>
+    </Card>
+  )
+}
 
 export default function Dashboard() {
   const [config, setConfig] = useState<Config | null>(null)
@@ -39,44 +84,37 @@ export default function Dashboard() {
     setEditingThreshold(false)
   }
 
-  const cancelEdit = () => {
-    setEditingThreshold(false)
-  }
-
-  const lastReport = reportCount > 0 ? `${reportCount} reports` : 'No reports yet'
+  const cancelEdit = () => setEditingThreshold(false)
 
   return (
-    <div>
-      <h1>Dashboard</h1>
-      <div className="cards">
-        <div className="card">
-          <div className="card-icon">📄</div>
-          <div className="card-body">
-            <div className="card-value">{config?.pages.length ?? '...'}</div>
-            <div className="card-label">Pages to test</div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-icon">📐</div>
-          <div className="card-body">
-            <div className="card-value">
-              {config ? `${config.viewport.width}×${config.viewport.height}` : '...'}
-            </div>
-            <div className="card-label">Viewport</div>
-          </div>
-        </div>
-        <div
-          className="card card-editable"
-          onClick={editingThreshold ? undefined : startEditThreshold}
-          onKeyDown={e => { if (!editingThreshold && (e.key === 'Enter' || e.key === ' ')) startEditThreshold() }}
-          tabIndex={0}
-          role="button"
-          aria-label="Edit threshold"
-        >
-          <div className="card-icon">🎯</div>
-          <div className="card-body">
-            {editingThreshold ? (
-              <div className="threshold-edit" onClick={e => e.stopPropagation()}>
+    <div className="space-y-8">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">
+          Visual regression monitoring overview.
+        </p>
+      </header>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          icon={FileText}
+          label="Pages to test"
+          value={config ? config.pages.length : <Skeleton className="h-6 w-10" />}
+        />
+        <StatCard
+          icon={Monitor}
+          label="Viewport"
+          value={config ? `${config.viewport.width}×${config.viewport.height}` : <Skeleton className="h-6 w-16" />}
+        />
+        <StatCard
+          icon={Target}
+          label="Threshold"
+          value={
+            editingThreshold ? (
+              <div
+                className="flex flex-col gap-1.5"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <input
                   ref={sliderRef}
                   type="range"
@@ -84,48 +122,69 @@ export default function Dashboard() {
                   max="1"
                   step="0.01"
                   value={thresholdInput}
-                  onChange={e => setThresholdInput(e.target.value)}
+                  onChange={(e) => setThresholdInput(e.target.value)}
                   onMouseUp={saveThreshold}
                   onTouchEnd={saveThreshold}
-                  onKeyDown={e => {
+                  onKeyDown={(e) => {
                     if (e.key === 'Escape') cancelEdit()
                     if (e.key === 'Enter') saveThreshold()
                   }}
                   className="threshold-slider"
+                  aria-label="Threshold percent"
                 />
-                <div className="threshold-value">{thresholdInput}%</div>
+                <span className="text-2xl font-bold tabular-nums text-primary">
+                  {thresholdInput}%
+                </span>
               </div>
+            ) : config ? (
+              <span className="tabular-nums">{config.threshold}%</span>
             ) : (
-              <>
-                <div className="card-value">{config?.threshold ?? '...'}%</div>
-                <div className="card-label">Threshold</div>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-icon">📋</div>
-          <div className="card-body">
-            <div className="card-value">{reportCount}</div>
-            <div className="card-label">{lastReport}</div>
-          </div>
-        </div>
+              <Skeleton className="h-6 w-10" />
+            )
+          }
+          onClick={editingThreshold ? undefined : startEditThreshold}
+          role="button"
+          tabIndex={0}
+          ariaLabel="Edit threshold"
+          onKeyDown={(e) => {
+            if (!editingThreshold && (e.key === 'Enter' || e.key === ' ')) startEditThreshold()
+          }}
+        />
+        <StatCard
+          icon={ClipboardList}
+          label={reportCount > 0 ? 'Reports total' : 'Reports'}
+          value={
+            reportCount > 0 && config ? (
+              <span className="tabular-nums">{reportCount}</span>
+            ) : config ? (
+              '—'
+            ) : (
+              <Skeleton className="h-6 w-10" />
+            )
+          }
+        />
       </div>
 
-      <div className="section">
-        <h2>Quick Actions</h2>
-        <div className="action-buttons">
-          <a href="/runner" className="btn btn-primary">
-            ▶️ Run Tests
-          </a>
-          <a href="/pages" className="btn btn-secondary">
-            📄 Manage Pages
-          </a>
-          <a href="/reports" className="btn btn-secondary">
-            📋 View Reports
-          </a>
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold tracking-tight">Quick Actions</h2>
+        <div className="flex flex-wrap gap-3">
+          <Button asChild>
+            <Link to="/runner">
+              <Play /> Run Tests
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/pages">
+              <Settings2 /> Manage Pages
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/reports">
+              <FileBarChart2 /> View Reports
+            </Link>
+          </Button>
         </div>
-      </div>
+      </section>
     </div>
   )
 }
