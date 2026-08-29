@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visual QA Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      color-scheme: dark;
+      --bg: #0e1117;
+      --card: #161a24;
+      --card-2: #1c2130;
+      --border: #262c3b;
+      --muted: #8b93a7;
+      --text: #e6e9f0;
+      --primary: #6e7bf5;
+      --green: #4ade80;
+      --red: #f87171;
+      --amber: #fbbf24;
+      --blue: #60a5fa;
+    }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background:
+        radial-gradient(1000px 500px at 15% -10%, rgba(110, 123, 245, 0.12), transparent),
+        radial-gradient(800px 400px at 90% 0%, rgba(96, 165, 250, 0.08), transparent),
+        var(--bg);
+      color: var(--text);
+      padding: clamp(1rem, 4vw, 2.5rem);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.5rem; }
+    h1 .mark { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 0.6rem; background: rgba(110,123,245,0.15); }
+    .meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.75rem; }
+    .summary {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    .stat {
+      background: linear-gradient(180deg, var(--card-2), var(--card));
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.25rem 1.75rem;
+      min-width: 140px;
+      flex: 1;
+      text-align: center;
+      box-shadow: 0 8px 24px -16px rgba(0, 0, 0, 0.5);
+    }
+    .stat .num { font-size: 2.5rem; font-weight: 800; line-height: 1.1; }
+    .stat .lbl { font-size: 0.78rem; color: var(--muted); margin-top: 0.4rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    .stat-total .num { color: var(--blue); }
+    .stat-pass .num { color: var(--green); }
+    .stat-fail .num { color: var(--red); }
+    .stat-total { border-top: 3px solid var(--blue); }
+    .stat-pass { border-top: 3px solid var(--green); }
+    .stat-fail { border-top: 3px solid var(--red); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      overflow: hidden;
+      box-shadow: 0 10px 30px -20px rgba(0, 0, 0, 0.6);
+    }
+    th {
+      background: var(--card-2);
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    td {
+      padding: 0.8rem 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.92rem;
+      vertical-align: middle;
+    }
+    .pass { color: var(--green); font-weight: 600; }
+    .fail { color: var(--red); font-weight: 600; }
+    .pass-row td:first-child { box-shadow: inset 3px 0 0 var(--green); }
+    .fail-row td:first-child { box-shadow: inset 3px 0 0 var(--red); }
+    .error-msg {
+      background: rgba(248, 113, 113, 0.06);
+      color: #fca5a5;
+      font-size: 0.85rem;
+    }
+    .images-row td { background: rgba(0, 0, 0, 0.12); }
+    .images-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      padding: 0.5rem 0;
+    }
+    .img-box {
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      text-align: center;
+    }
+    .img-box img {
+      width: 100%;
+      border-radius: 0.5rem;
+      margin-top: 0.5rem;
+      border: 1px solid var(--border);
+      cursor: zoom-in;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    .img-box img:hover { opacity: 0.85; transform: scale(1.01); }
+    .img-label { font-size: 0.72rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .no-img { color: #4b5563; font-size: 0.85rem; margin-top: 0.5rem; }
+    .no-diff { border-style: dashed; }
+
+    /* AI Analysis */
+    .ai-analysis-row td { background: rgba(0, 0, 0, 0.12); padding: 0; }
+    .ai-analysis-panel {
+      padding: 1.5rem;
+      border-left: 4px solid var(--blue);
+    }
+    .ai-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .ai-icon { font-size: 1.35rem; }
+    .ai-title { font-size: 1.05rem; font-weight: 600; }
+    .ai-classification { padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #14171f; }
+    .ai-confidence { margin-left: auto; font-size: 0.82rem; color: var(--muted); }
+    .ai-reasoning, .ai-suggestions, .ai-changed-elements {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      line-height: 1.6;
+    }
+    .ai-suggestions ul { margin: 0.5rem 0 0 1.25rem; }
+    .ai-suggestions li { margin: 0.4rem 0; }
+    .ai-changed-elements { overflow-x: auto; }
+    .elements-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; margin-top: 0.75rem; }
+    .elements-table th, .elements-table td { padding: 0.5rem; border: 1px solid var(--border); }
+    .elements-table th { background: var(--card-2); }
+    .elements-table code { background: rgba(0, 0, 0, 0.35); padding: 0.15rem 0.4rem; border-radius: 0.35rem; font-size: 0.78rem; }
+    .change-type { text-transform: capitalize; font-weight: 600; }
+    .change-type.added { color: var(--green); }
+    .change-type.removed { color: var(--red); }
+    .change-type.moved { color: var(--blue); }
+    .change-type.styled { color: var(--amber); }
+    .change-type.text_changed { color: var(--red); }
+    .change-type.attribute_changed { color: #a78bfa; }
+    .impact { text-transform: capitalize; font-weight: 600; }
+    .impact.none { color: #6b7280; }
+    .impact.low { color: var(--green); }
+    .impact.medium { color: var(--amber); }
+    .impact.high { color: #fb923c; }
+    .impact.critical { color: var(--red); }
+    .ai-a11y-issues {
+      background: rgba(248, 113, 113, 0.05);
+      border: 1px solid rgba(248, 113, 113, 0.25);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .ai-a11y-issues ul { margin: 0.5rem 0 0 1.25rem; }
+    .ai-a11y-issues li { margin: 0.4rem 0; }
+    .severity { padding: 0.1rem 0.45rem; border-radius: 0.35rem; font-size: 0.68rem; font-weight: 700; margin-right: 0.5rem; }
+    .severity.minor { background: rgba(74, 222, 128, 0.15); color: var(--green); }
+    .severity.moderate { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
+    .severity.serious { background: rgba(251, 146, 60, 0.15); color: #fb923c; }
+    .severity.critical { background: rgba(248, 113, 113, 0.15); color: var(--red); }
+    .ai-metadata { color: var(--muted); font-size: 0.75rem; }
+    .ai-badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; color: #14171f; }
+
+    /* Lightbox */
+    .lightbox-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+    }
+    .lightbox-overlay.open { display: flex; }
+    .lightbox-overlay img {
+      max-width: 92vw;
+      max-height: 92vh;
+      border-radius: 0.75rem;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+      cursor: default;
+    }
+    .lightbox-close {
+      position: fixed;
+      top: 1rem;
+      right: 1.5rem;
+      color: #fff;
+      font-size: 2.2rem;
+      cursor: pointer;
+      line-height: 1;
+      opacity: 0.7;
+      transition: opacity 0.15s;
+      background: none;
+      border: none;
+    }
+    .lightbox-close:hover { opacity: 1; }
+
+    @media (max-width: 640px) {
+      .images-grid { grid-template-columns: 1fr; }
+      .summary { flex-direction: column; }
+      .stat { min-width: auto; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="lightbox" class="lightbox-overlay" onclick="closeLightbox()">
+    <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+    <img id="lightbox-img" src="" alt="enlarged" onclick="event.stopPropagation()" />
+  </div>
+
+  <div class="wrap">
+  <h1><span class="mark">🔍</span> Visual QA Report</h1>
+  <p class="meta">Generated: 8/29/2026, 3:49:24 PM</p>
+
+  <div class="summary">
+    <div class="stat stat-total">
+      <div class="num">0</div>
+      <div class="lbl">Total Pages</div>
+    </div>
+    <div class="stat stat-pass">
+      <div class="num">0</div>
+      <div class="lbl">Passed</div>
+    </div>
+    <div class="stat stat-fail">
+      <div class="num">0</div>
+      <div class="lbl">Failed</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Page</th>
+        <th>Status</th>
+        <th>Diff %</th>
+        <th>Diff Pixels</th>
+        <th>AI Classification</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+    </tbody>
+  </table>
+  </div>
+
+  <script>
+    function openLightbox(src) {
+      document.getElementById('lightbox-img').src = src;
+      document.getElementById('lightbox').classList.add('open');
+    }
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.remove('open');
+    }
+    document.addEventListener('click', function(e) {
+      if (e.target.classList.contains('clickable-img')) {
+        openLightbox(e.target.src);
+      }
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeLightbox();
+    });
+  </script>
+</body>
+</html>
