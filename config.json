@@ -34,12 +34,6 @@
       "threshold": 0.2
     },
     {
-      "name": "categories",
-      "url": "https://qa-sandbox-app.vercel.app/categories",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
       "name": "products",
       "url": "https://qa-sandbox-app.vercel.app/products",
       "mask": [],
