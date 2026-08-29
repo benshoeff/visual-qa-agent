@@ -14,12 +14,6 @@
     {
       "name": "Users",
       "url": "https://qa-sandbox-app.vercel.app/users"
-    },
-    {
-      "name": "orders",
-      "url": "https://qa-sandbox-app.vercel.app/orders",
-      "mask": [],
-      "threshold": 0.2
     }
   ],
   "ai": {
