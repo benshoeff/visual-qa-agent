@@ -4,7 +4,7 @@
     "width": 1280,
     "height": 720
   },
-  "timestamp": "2026-08-29T16:01:37.633Z",
+  "timestamp": "2026-07-11T07:25:15.200Z",
   "lighthouse": {
     "performance": 100,
     "accessibility": 83,
@@ -12,11 +12,11 @@
     "seo": 80,
     "pwa": 0,
     "coreWebVitals": {
-      "lcp": 354,
-      "fid": 76,
+      "lcp": 381,
+      "fid": 16,
       "cls": 0,
-      "fcp": 247,
-      "ttfb": 3,
+      "fcp": 281,
+      "ttfb": 61,
       "inp": 0
     }
   },
