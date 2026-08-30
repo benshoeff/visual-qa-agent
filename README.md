@@ -48,7 +48,7 @@ npm run server              # => http://localhost:3456
 ## איך זה עובד
 
 1. ממשק ה-Vercel קורא/כותב קבצים (config.json, schedules.json, baselines, דוחות) ישירות ב-repo דרך GitHub API.
-2. ריצת בדיקה נקראת על ידי `workflow_dispatch` ל-GitHub Actions, או ע"י `schedule:` (כל 30 דקות) שבודק את `schedules.json`.
+2. הבדיקה הלילית רצה ע"י `schedule:` ישירות ב-GitHub Actions (ברירת מחדל `0 9 * * *` UTC – מוגדר ב-`.github/workflows/visual-qa.yml`), וריצות ידניות נקראות ע"י `workflow_dispatch` מהדאשבורד.
 3. ה-Workflow מריץ את Playwright ומחזיר את התוצאות (baselines / current / diffs / reports) בחזרה ל-git – כך הדוחות זמינים בממשק.
 4. **Cleanup** – כל יום ראשון 03:00 UTC מנקה קבצים זמניים (reports, current, diffs, crawl-results).
 

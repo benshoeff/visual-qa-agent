@@ -42,7 +42,7 @@ export function generateReport(
 ): void {
   const passed = results.filter((r) => r.passed).length;
   const failed = results.filter((r) => !r.passed).length;
-  const timestamp = new Date().toLocaleString("en-US");
+  const generatedAt = Date.now();
 
   const toBase64 = (filePath: string) => {
     if (!filePath || !fs.existsSync(filePath)) return "";
@@ -441,7 +441,7 @@ export function generateReport(
 
   <div class="wrap">
   <h1><span class="mark">🔍</span> Visual QA Report</h1>
-  <p class="meta">Generated: ${timestamp}</p>
+  <p class="meta">Generated: <span id="generated-at" data-ts="${generatedAt}">${new Date(generatedAt).toLocaleString("en-US", { timeZone: "UTC", timeZoneName: "short" })}</span></p>
 
   <div class="summary">
     <div class="stat stat-total">
@@ -475,6 +475,13 @@ export function generateReport(
   </div>
 
   <script>
+    (function () {
+      const el = document.getElementById('generated-at');
+      if (el) {
+        const ts = Number(el.dataset.ts);
+        if (ts) el.textContent = new Date(ts).toLocaleString('en-US');
+      }
+    })();
     function openLightbox(src) {
       document.getElementById('lightbox-img').src = src;
       document.getElementById('lightbox').classList.add('open');

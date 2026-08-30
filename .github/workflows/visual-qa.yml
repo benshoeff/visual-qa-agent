@@ -2,7 +2,7 @@ name: Visual QA Engine
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '0 9 * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -42,10 +42,6 @@ on:
         required: false
         default: ''
         type: string
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
 
 permissions:
   contents: write
@@ -72,9 +68,9 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Run scheduled jobs
+      - name: Run nightly test (scheduled)
         if: github.event_name == 'schedule'
-        run: npm run run:scheduled
+        run: npm run test
 
       - name: Run crawl
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'crawl'
@@ -91,17 +87,13 @@ jobs:
           PAGES: ${{ github.event.inputs.pages }}
         run: npm run ${{ github.event.inputs.mode }}
 
-      - name: Run tests (CI)
-        if: github.event_name == 'push' || github.event_name == 'pull_request'
-        run: npm run test
-
       # When re-capturing baselines, old current/diffs are stale — remove them.
       - name: Remove stale current/diffs (baseline update)
         if: always() && github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'baseline'
         run: rm -f current/*.png diffs/*.png || true
 
       - name: Commit results back to git
-        if: always() && github.event_name != 'pull_request'
+        if: always()
         run: |
           git config user.name "visual-qa-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
