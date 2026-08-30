@@ -243,6 +243,61 @@ router.get("/reports/:filename", (req: Request, res: Response) => {
   }
 });
 
+// ─── Files (mirrors Vercel serverless api/files.ts) ─────────────────────
+
+router.get("/files", (req: Request, res: Response) => {
+  try {
+    const type = req.query.type as string;
+    const name = req.query.name as string;
+    if (!type || !name) {
+      res.status(400).json({ error: "type and name are required" });
+      return;
+    }
+
+    let filePath: string;
+    let contentType: string;
+    let root: string;
+
+    if (type === "report") {
+      filePath = path.join(REPORTS_DIR, name);
+      contentType = "text/html; charset=utf-8";
+      root = REPORTS_DIR;
+    } else {
+      const dir =
+        type === "baseline"
+          ? BASELINES_DIR
+          : type === "current"
+            ? CURRENT_DIR
+            : type === "diff"
+              ? DIFFS_DIR
+              : null;
+      if (!dir) {
+        res.status(400).json({ error: `Unknown type "${type}"` });
+        return;
+      }
+      const base = name.replace(/\.png$/i, "");
+      filePath = path.join(dir, `${base}.png`);
+      contentType = "image/png";
+      root = dir;
+    }
+
+    const resolved = path.resolve(filePath);
+    const rootResolved = path.resolve(root);
+    if (!resolved.startsWith(rootResolved + path.sep)) {
+      res.status(400).json({ error: "Invalid file path" });
+      return;
+    }
+    if (!fs.existsSync(resolved)) {
+      res.status(404).json({ error: "File not found" });
+      return;
+    }
+    res.setHeader("Content-Type", contentType);
+    res.sendFile(resolved);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 // ─── Schedules ──────────────────────────────────────────────────────────
 
 router.get("/schedules", (_req: Request, res: Response) => {

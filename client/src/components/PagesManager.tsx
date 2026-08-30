@@ -36,7 +36,15 @@ const emptyPage = (): PageConfig => ({ name: '', url: '' })
 
 type LoadingState = Record<string, 'baseline' | 'test' | null>
 
-function PageThumbnail({ name, refreshKey }: { name: string; refreshKey: number }) {
+function PageThumbnail({
+  name,
+  refreshKey,
+  onPreview,
+}: {
+  name: string
+  refreshKey: number
+  onPreview: (url: string) => void
+}) {
   const [hidden, setHidden] = useState(false)
   const url = `${getImageUrl('baseline', name)}&t=${refreshKey}`
 
@@ -48,8 +56,10 @@ function PageThumbnail({ name, refreshKey }: { name: string; refreshKey: number 
     <img
       src={url}
       alt={name}
-      className="size-[60px] rounded-md border object-cover"
+      title={`Preview ${name}`}
+      className="size-[60px] cursor-pointer rounded-md border object-cover transition-opacity hover:opacity-80"
       onError={() => setHidden(true)}
+      onClick={() => onPreview(url)}
     />
   )
 }
@@ -63,6 +73,7 @@ export default function PagesManager() {
   const [loadingPages, setLoadingPages] = useState<LoadingState>({})
   const [refreshKey, setRefreshKey] = useState(0)
   const [originalName, setOriginalName] = useState<string | null>(null)
+  const [preview, setPreview] = useState<{ name: string; url: string } | null>(null)
 
   const refresh = useCallback(() => getPages().then(setPages), [])
 
@@ -190,7 +201,11 @@ export default function PagesManager() {
                 return (
                   <TableRow key={p.name}>
                     <TableCell>
-                      <PageThumbnail name={p.name} refreshKey={refreshKey} />
+                      <PageThumbnail
+                        name={p.name}
+                        refreshKey={refreshKey}
+                        onPreview={(url) => setPreview({ name: p.name, url })}
+                      />
                     </TableCell>
                     <TableCell>
                       <span className="font-medium">{p.name}</span>
@@ -356,6 +371,22 @@ export default function PagesManager() {
               Delete
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    {/* Preview dialog */}
+      <Dialog open={preview != null} onOpenChange={(o) => !o && setPreview(null)}>
+        <DialogContent className="max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{preview?.name}</DialogTitle>
+            <DialogDescription>Baseline screenshot</DialogDescription>
+          </DialogHeader>
+          {preview && (
+            <img
+              src={preview.url}
+              alt={`${preview.name} preview`}
+              className="w-full rounded-md border"
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
