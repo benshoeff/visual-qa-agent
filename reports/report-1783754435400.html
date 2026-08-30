@@ -271,7 +271,7 @@
   </div>
 
   <h1>🔍 Visual QA Report</h1>
-  <p class="meta">Generated: 7/11/2026, 10:20:35 AM</p>
+    <p class="meta">Generated: <span id="generated-at" data-ts="1783754435400">7/11/2026, 7:20:35 AM UTC</span></p>
 
   <div class="summary">
     <div class="stat stat-total">
@@ -324,6 +324,7 @@
   </table>
 
   <script>
+    (function(){var e=document.getElementById('generated-at');if(e){var t=Number(e.dataset.ts);if(t)e.textContent=new Date(t).toLocaleString('en-US');}})();
     function openLightbox(src) {
       document.getElementById('lightbox-img').src = src;
       document.getElementById('lightbox').classList.add('open');
