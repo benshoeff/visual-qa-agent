@@ -172,7 +172,7 @@
                 {
                   "html": "<a class=\"card px-5 py-4 border-2 hover:shadow-md transition-all bg-rose-50 text-rose-700 border-rose-200\" href=\"/posts\">",
                   "target": [
-                    ".bg-rose-50.text-rose-700.border-rose-200:nth-child(6)"
+                    ".bg-rose-50"
                   ]
                 }
               ],
@@ -185,7 +185,7 @@
           "impact": "serious",
           "html": "<p class=\"text-sm font-medium opacity-80\">Posts</p>",
           "target": [
-            ".bg-rose-50.text-rose-700.border-rose-200:nth-child(6) > .justify-between.flex.items-center > div > .opacity-80.font-medium"
+            ".bg-rose-50 > .justify-between.flex.items-center > div > .opacity-80.font-medium"
           ],
           "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.32 (foreground color: #cb3f60, background color: #fff1f2, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
         },
@@ -222,210 +222,6 @@
             ".bg-orange-50 > .justify-between.flex.items-center > div > .opacity-80.font-medium"
           ],
           "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.56 (foreground color: #ce6539, background color: #fff7ed, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "fgColor": "#3c918a",
-                "bgColor": "#f0fdfa",
-                "contrastRatio": 3.58,
-                "fontSize": "10.5pt (14px)",
-                "fontWeight": "normal",
-                "messageKey": null,
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<a class=\"card px-5 py-4 border-2 hover:shadow-md transition-all bg-teal-50 text-teal-700 border-teal-200\" href=\"/customers\">",
-                  "target": [
-                    ".bg-teal-50"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element has insufficient color contrast of 3.58 (foreground color: #3c918a, background color: #f0fdfa, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<p class=\"text-sm font-medium opacity-80\">Customers</p>",
-          "target": [
-            ".bg-teal-50 > .justify-between.flex.items-center > div > .opacity-80.font-medium"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.58 (foreground color: #3c918a, background color: #f0fdfa, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "fgColor": "#cb447c",
-                "bgColor": "#fdf2f8",
-                "contrastRatio": 4.12,
-                "fontSize": "10.5pt (14px)",
-                "fontWeight": "normal",
-                "messageKey": null,
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<a class=\"card px-5 py-4 border-2 hover:shadow-md transition-all bg-pink-50 text-pink-700 border-pink-200\" href=\"/tickets\">",
-                  "target": [
-                    ".bg-pink-50"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element has insufficient color contrast of 4.12 (foreground color: #cb447c, background color: #fdf2f8, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<p class=\"text-sm font-medium opacity-80\">Tickets</p>",
-          "target": [
-            ".bg-pink-50 > .justify-between.flex.items-center > div > .opacity-80.font-medium"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.12 (foreground color: #cb447c, background color: #fdf2f8, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "fgColor": "#6f963a",
-                "bgColor": "#f7fee7",
-                "contrastRatio": 3.32,
-                "fontSize": "10.5pt (14px)",
-                "fontWeight": "normal",
-                "messageKey": null,
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<a class=\"card px-5 py-4 border-2 hover:shadow-md transition-all bg-lime-50 text-lime-700 border-lime-200\" href=\"/projects\">",
-                  "target": [
-                    ".bg-lime-50"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element has insufficient color contrast of 3.32 (foreground color: #6f963a, background color: #f7fee7, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<p class=\"text-sm font-medium opacity-80\">Projects</p>",
-          "target": [
-            ".bg-lime-50 > .justify-between.flex.items-center > div > .opacity-80.font-medium"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.32 (foreground color: #6f963a, background color: #f7fee7, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "fgColor": "#b48134",
-                "bgColor": "#fefce8",
-                "contrastRatio": 3.31,
-                "fontSize": "10.5pt (14px)",
-                "fontWeight": "normal",
-                "messageKey": null,
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<a class=\"card px-5 py-4 border-2 hover:shadow-md transition-all bg-yellow-50 text-yellow-700 border-yellow-200\" href=\"/reviews\">",
-                  "target": [
-                    ".bg-yellow-50"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element has insufficient color contrast of 3.31 (foreground color: #b48134, background color: #fefce8, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<p class=\"text-sm font-medium opacity-80\">Reviews</p>",
-          "target": [
-            ".bg-yellow-50 > .justify-between.flex.items-center > div > .opacity-80.font-medium"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 3.31 (foreground color: #b48134, background color: #fefce8, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "fgColor": "#b447bf",
-                "bgColor": "#fdf4ff",
-                "contrastRatio": 4.25,
-                "fontSize": "10.5pt (14px)",
-                "fontWeight": "normal",
-                "messageKey": null,
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<a class=\"card px-5 py-4 border-2 hover:shadow-md transition-all bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200\" href=\"/employees\">",
-                  "target": [
-                    ".bg-fuchsia-50"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element has insufficient color contrast of 4.25 (foreground color: #b447bf, background color: #fdf4ff, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<p class=\"text-sm font-medium opacity-80\">Employees</p>",
-          "target": [
-            ".bg-fuchsia-50 > .justify-between.flex.items-center > div > .opacity-80.font-medium"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.25 (foreground color: #b447bf, background color: #fdf4ff, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
-                "fgColor": "#cb3f60",
-                "bgColor": "#fff1f2",
-                "contrastRatio": 4.32,
-                "fontSize": "10.5pt (14px)",
-                "fontWeight": "normal",
-                "messageKey": null,
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<a class=\"card px-5 py-4 border-2 hover:shadow-md transition-all bg-rose-50 text-rose-700 border-rose-200\" href=\"/departments\">",
-                  "target": [
-                    ".bg-rose-50.text-rose-700.border-rose-200:nth-child(15)"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element has insufficient color contrast of 4.32 (foreground color: #cb3f60, background color: #fff1f2, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<p class=\"text-sm font-medium opacity-80\">Departments</p>",
-          "target": [
-            ".bg-rose-50.text-rose-700.border-rose-200:nth-child(15) > .justify-between.flex.items-center > div > .opacity-80.font-medium"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.32 (foreground color: #cb3f60, background color: #fff1f2, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
         }
       ]
     },
@@ -513,9 +309,9 @@
     }
   ],
   "passes": 23,
-  "incomplete": 1,
+  "incomplete": 0,
   "inapplicable": 64,
-  "timestamp": "2026-08-29T16:01:18.518Z",
+  "timestamp": "2026-07-11T07:08:49.431Z",
   "url": "https://qa-sandbox-app.vercel.app/",
   "viewport": {
     "width": 1280,
