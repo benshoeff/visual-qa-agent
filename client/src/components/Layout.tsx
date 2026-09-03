@@ -12,6 +12,7 @@ import {
   Moon,
   Monitor,
   Sparkles,
+  History,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,6 +32,7 @@ const links = [
   { to: '/pages', label: 'Pages', icon: FileText },
   { to: '/crawl', label: 'Site Crawler', icon: ScanSearch },
   { to: '/runner', label: 'Test Runner', icon: Play },
+  { to: '/history', label: 'Run History', icon: History },
   { to: '/schedules', label: 'Schedules', icon: Clock },
   { to: '/reports', label: 'Reports', icon: FileBarChart2 },
 ]

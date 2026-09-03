@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Camera,
   Loader2,
@@ -9,10 +9,22 @@ import {
   FileBarChart2,
   CheckSquare,
   Square,
+  AlertTriangle,
+  History as HistoryIcon,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { getPages, dispatchRun, getRunStatus, isRunPending, runConclusion } from '../api'
+import {
+  getPages,
+  dispatchRun,
+  getRunStatus,
+  isRunPending,
+  runConclusion,
+  getReports,
+  fetchReportHtml,
+} from '../api'
 import type { PageConfig, RunStatus } from '../api'
+import { parseReport } from '@/lib/reportParser'
+import type { PageResult } from '@/lib/reportParser'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -25,11 +37,29 @@ export default function TestRunner() {
   const [pages, setPages] = useState<PageConfig[]>([])
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set())
   const [runStatus, setRunStatus] = useState<RunStatus | null>(null)
+  const [runSummary, setRunSummary] = useState<PageResult[]>([])
   const polling = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const loadSummary = async () => {
+    try {
+      const reports = await getReports()
+      const latest = reports[0]
+      if (!latest) {
+        setRunSummary([])
+        return
+      }
+      const html = await fetchReportHtml(latest.filename)
+      const { pages } = parseReport(html)
+      setRunSummary(pages)
+    } catch {
+      setRunSummary([])
+    }
+  }
 
   useEffect(() => {
     getPages().then(setPages).catch(() => {})
     getRunStatus().then((runs) => setRunStatus(runs[0] ?? null)).catch(() => {})
+    loadSummary()
   }, [])
 
   useEffect(() => {
@@ -56,6 +86,7 @@ export default function TestRunner() {
           stopPolling()
           setLoading(null)
           getPages().then(setPages).catch(() => {})
+          loadSummary()
         }
       } catch {
         stopPolling()
@@ -97,6 +128,11 @@ export default function TestRunner() {
 
   const conclusion = runConclusion(runStatus)
   const pending = isRunPending(runStatus)
+
+  const summaryPassed = runSummary.filter((r) => r.passed).length
+  const summaryFailed = runSummary.filter((r) => !r.passed && r.errored).length
+  const summaryFailedNotErrored = runSummary.filter((r) => !r.passed && !r.errored).length
+  const summaryFailedCount = summaryFailed + summaryFailedNotErrored
 
   return (
     <div className="space-y-6">
@@ -238,6 +274,40 @@ export default function TestRunner() {
                 </span>
               </div>
             )}
+            {!pending && latestByPage.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm">
+                  <span className="font-medium">{summaryPassed} passed</span>
+                  <span className="mx-1 text-muted-foreground">/</span>
+                  <span className="font-medium text-destructive">{summaryFailed} failed</span>
+                  <span className="mx-1 text-muted-foreground">/</span>
+                  <span className="text-muted-foreground">{latestByPage.length} pages</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {latestByPage.map((r) => {
+                    const ok = r.status === 'PASSED' || r.status === 'AI_ACCEPTED' || r.status === 'AI_REJECTED'
+                    const err = r.status === 'FAILED' || r.status === 'ERROR'
+                    return (
+                      <span
+                        key={r.page}
+                        title={`${r.page}: ${r.status} · diff ${r.diffPercent}%`}
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium',
+                          ok
+                            ? 'border-success/40 bg-success/10 text-success'
+                            : err
+                              ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                              : 'border-warning/40 bg-warning/10 text-foreground'
+                        )}
+                      >
+                        {ok ? <CheckCircle2 /> : err ? <XCircle /> : <AlertTriangle />}
+                        {r.page}
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" asChild>
                 <a href={runStatus.htmlUrl} target="_blank" rel="noreferrer">
@@ -247,6 +317,11 @@ export default function TestRunner() {
               <Button variant="ghost" size="sm" asChild>
                 <Link to="/reports">
                   <FileBarChart2 /> View Reports
+                </Link>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/history">
+                  <HistoryIcon /> View History
                 </Link>
               </Button>
             </div>

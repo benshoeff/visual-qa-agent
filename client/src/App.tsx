@@ -6,6 +6,7 @@ import PagesManager from './components/PagesManager'
 import CrawlManager from './components/CrawlManager'
 import TestRunner from './components/TestRunner'
 import ReportViewer from './components/ReportViewer'
+import RunHistory from './components/RunHistory'
 import ScheduleManager from './components/ScheduleManager'
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/pages" element={<PagesManager />} />
             <Route path="/crawl" element={<CrawlManager />} />
             <Route path="/runner" element={<TestRunner />} />
+            <Route path="/history" element={<RunHistory />} />
             <Route path="/schedules" element={<ScheduleManager />} />
             <Route path="/reports" element={<ReportViewer />} />
           </Routes>
