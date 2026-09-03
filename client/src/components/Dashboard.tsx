@@ -183,6 +183,11 @@ export default function Dashboard() {
               <FileBarChart2 /> View Reports
             </Link>
           </Button>
+          <Button variant="outline" asChild>
+            <Link to="/history">
+              <FileBarChart2 /> Run History
+            </Link>
+          </Button>
         </div>
       </section>
     </div>
