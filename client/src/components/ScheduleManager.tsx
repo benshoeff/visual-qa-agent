@@ -252,7 +252,7 @@ export default function ScheduleManager() {
 
       {/* Editor dialog */}
       <Dialog open={editor != null} onOpenChange={(o) => !o && closeEditor()}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editor?.isNew ? 'New Schedule' : 'Edit Schedule'}</DialogTitle>
             <DialogDescription>

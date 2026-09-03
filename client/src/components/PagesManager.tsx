@@ -280,7 +280,7 @@ export default function PagesManager() {
 
       {/* Add / Edit dialog */}
       <Dialog open={editing != null} onOpenChange={(o) => !o && closeEditor()}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{isNew ? 'Add Page' : 'Edit Page'}</DialogTitle>
             <DialogDescription>
