@@ -269,7 +269,7 @@ export default function RunHistory() {
       </Card>
 
       <Dialog open={diffView != null} onOpenChange={(o) => !o && setDiffView(null)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-auto">
           <DialogHeader>
             <DialogTitle>{diffView?.page}</DialogTitle>
           </DialogHeader>

@@ -50,7 +50,7 @@ export default function DiffSlider({ baselineUrl, currentUrl, label }: Props) {
       <div
         ref={containerRef}
         className={cn(
-          'relative select-none overflow-hidden rounded-xl border bg-muted',
+          'relative max-h-[75vh] select-none overflow-hidden rounded-xl border bg-muted',
           dragging ? 'cursor-col-resize' : 'cursor-ew-resize'
         )}
         onMouseDown={onMouseDown}
@@ -70,7 +70,7 @@ export default function DiffSlider({ baselineUrl, currentUrl, label }: Props) {
             src={baselineUrl}
             alt="Baseline"
             draggable={false}
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-contain"
           />
         </div>
 
