@@ -4,7 +4,7 @@ import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
 import { OllamaVisionClient, buildVisionPrompt } from "./index.js";
 import { CompareResult } from "../compare.js";
-import { PageConfig, BASELINES_DIR, CURRENT_DIR, DIFFS_DIR, screenshotPath } from "../config.js";
+import { PageConfig, IgnoreZone, BASELINES_DIR, CURRENT_DIR, DIFFS_DIR, screenshotPath } from "../config.js";
 
 export interface VisionAnalysis {
   semanticPassed: boolean;
@@ -82,12 +82,13 @@ export class AIAnalysisEngine {
     currentPath: string,
     diffPath: string,
     threshold: number,
-    pageConf: PageConfig
+    pageConf: PageConfig,
+    ignoreZones: IgnoreZone[] = []
   ): Promise<EnhancedCompareResult> {
     const startTime = Date.now();
 
     // First, do pixel comparison
-    const pixelResult = this.pixelCompare(pageName, baselinePath, currentPath, diffPath, threshold);
+    const pixelResult = this.pixelCompare(pageName, baselinePath, currentPath, diffPath, threshold, ignoreZones);
 
     // If AI is disabled or pixel match is perfect, return pixel result
     if (!this.config.enabled) {
@@ -165,7 +166,8 @@ export class AIAnalysisEngine {
     baselinePath: string,
     currentPath: string,
     diffPath: string,
-    threshold: number
+    threshold: number,
+    ignoreZones: IgnoreZone[] = []
   ): CompareResult {
     if (!fs.existsSync(baselinePath)) {
       return {
@@ -202,6 +204,30 @@ export class AIAnalysisEngine {
     const pixels = width * height;
     const diffImg = new PNG({ width, height });
 
+    const boundingBoxZones = ignoreZones.filter(
+      (z) => z.type === "bounding-box" && z.enabled
+    );
+
+    if (boundingBoxZones.length > 0) {
+      const NEUTRAL = [128, 128, 128, 255];
+      for (const img of [baselineImg, currentImg]) {
+        for (const zone of boundingBoxZones) {
+          if (zone.x == null || zone.y == null || zone.width == null || zone.height == null) continue;
+          const x2 = Math.min(zone.x + zone.width, width);
+          const y2 = Math.min(zone.y + zone.height, height);
+          for (let py: number = zone.y; py < y2; py++) {
+            for (let px: number = zone.x; px < x2; px++) {
+              const offset = (py * width + px) * 4;
+              img.data[offset] = NEUTRAL[0];
+              img.data[offset + 1] = NEUTRAL[1];
+              img.data[offset + 2] = NEUTRAL[2];
+              img.data[offset + 3] = NEUTRAL[3];
+            }
+          }
+        }
+      }
+    }
+
     const diffPixels = pixelmatch(
       baselineImg.data,
       currentImg.data,
@@ -211,7 +237,12 @@ export class AIAnalysisEngine {
       { threshold: 0.1, includeAA: false }
     );
 
-    const diffPercent = (diffPixels / pixels) * 100;
+    const ignoredPixels = boundingBoxZones.reduce((sum, z) => {
+      if (z.x == null || z.y == null || z.width == null || z.height == null) return sum;
+      return sum + Math.min(z.width, width - z.x) * Math.min(z.height, height - z.y);
+    }, 0);
+    const effectivePixels = pixels - ignoredPixels;
+    const diffPercent = effectivePixels > 0 ? (diffPixels / effectivePixels) * 100 : 0;
     const passed = diffPercent <= threshold * 100;
 
     if (diffPixels > 0) {

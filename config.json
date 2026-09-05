@@ -10,7 +10,8 @@
       "name": "homepage",
       "url": "https://qa-sandbox-app.vercel.app/",
       "mask": [],
-      "threshold": 0.2
+      "threshold": 0.2,
+      "ignoreZones": []
     },
     {
       "name": "users",
@@ -103,6 +104,7 @@
       "threshold": 0.2
     }
   ],
+  "globalIgnoreZones": [],
   "ai": {
     "enabled": false,
     "model": "llama3.2-vision:11b",

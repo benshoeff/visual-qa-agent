@@ -8,6 +8,7 @@ import TestRunner from './components/TestRunner'
 import ReportViewer from './components/ReportViewer'
 import RunHistory from './components/RunHistory'
 import ScheduleManager from './components/ScheduleManager'
+import IgnoreZonesPage from './components/IgnoreZonesPage'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
             <Route path="/history" element={<RunHistory />} />
             <Route path="/schedules" element={<ScheduleManager />} />
             <Route path="/reports" element={<ReportViewer />} />
+            <Route path="/ignore-zones" element={<IgnoreZonesPage />} />
           </Routes>
         </ErrorBoundary>
       </Layout>

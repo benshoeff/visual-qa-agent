@@ -178,6 +178,48 @@ export function validateCron(cronExpression: string): { valid: boolean; nextRun:
   return { valid, nextRun: valid ? 'Pending (runs via GitHub Actions schedule)' : null }
 }
 
+// Ignore Zones
+export interface IgnoreZone {
+  id: string
+  name: string
+  type: 'bounding-box' | 'selector'
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  selector?: string
+  enabled: boolean
+}
+
+export async function getIgnoreZones(pageName?: string): Promise<IgnoreZone[]> {
+  const params = pageName ? `?page=${encodeURIComponent(pageName)}` : ''
+  return request<IgnoreZone[]>(`/api/ignore-zones${params}`)
+}
+
+export async function getIgnoreZonesAll(): Promise<{ global: IgnoreZone[]; pages: Record<string, IgnoreZone[]> }> {
+  return request(`/api/ignore-zones`)
+}
+
+export async function createIgnoreZone(zone: Omit<IgnoreZone, 'id'> & { pageName?: string }): Promise<IgnoreZone> {
+  return request<IgnoreZone>('/api/ignore-zones', {
+    method: 'POST',
+    body: JSON.stringify(zone),
+  })
+}
+
+export async function updateIgnoreZone(id: string, updates: Partial<IgnoreZone>, pageName?: string): Promise<void> {
+  const params = pageName ? `?page=${encodeURIComponent(pageName)}` : ''
+  await request(`/api/ignore-zones/${id}${params}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  })
+}
+
+export async function deleteIgnoreZone(id: string, pageName?: string): Promise<void> {
+  const params = pageName ? `?page=${encodeURIComponent(pageName)}` : ''
+  await request(`/api/ignore-zones/${id}${params}`, { method: 'DELETE' })
+}
+
 // Crawl
 export interface DiscoveredPage {
   url: string
