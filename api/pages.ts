@@ -103,6 +103,10 @@ interface PageConfig {
   waitForSelector?: string;
   mask?: string[];
   threshold?: number;
+  captureMode?: "viewport" | "fullPage";
+  fullPageScrollable?: string;
+  fullPageKeepVisible?: string[];
+  ignoreZones?: unknown[];
 }
 
 interface Config {

@@ -94,7 +94,7 @@ export default function IgnoreZonesPage() {
             Ignore Zones
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Define areas to ignore during visual comparison — reduce false positives from dynamic content.
+            Define areas to ignore during visual comparison - reduce false positives from dynamic content.
           </p>
         </div>
       </div>

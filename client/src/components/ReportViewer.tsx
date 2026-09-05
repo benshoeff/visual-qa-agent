@@ -10,9 +10,9 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { getReports, getReportUrl, getImageUrl, fetchReportHtml } from '../api'
+import { getReports, getReportUrl, getImageUrl, fetchReportHtml, getDiffRegions, type DiffRegion } from '../api'
 import type { ReportFile } from '../api'
-import DiffSlider from './DiffSlider'
+import FullPageDiff from './FullPageDiff'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -93,6 +93,7 @@ export default function ReportViewer() {
   const [report, setReport] = useState<{ summary: Summary | null; pages: PageResult[] } | null>(null)
   const [page, setPage] = useState(0)
   const [diffView, setDiffView] = useState<{ page: string; errored?: boolean } | null>(null)
+  const [diffRegions, setDiffRegions] = useState<DiffRegion[]>([])
 
   const totalPages = Math.max(1, Math.ceil(reports.length / PER_PAGE))
   const paginated = reports.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
@@ -279,7 +280,13 @@ export default function ReportViewer() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => setDiffView({ page: p.pageName })}
+                                    onClick={() => {
+                                      setDiffView({ page: p.pageName })
+                                      setDiffRegions([])
+                                      getDiffRegions(p.pageName).then((data) =>
+                                        setDiffRegions(data?.regions ?? [])
+                                      )
+                                    }}
                                   >
                                     <GitCompareArrows /> Compare
                                   </Button>
@@ -308,15 +315,16 @@ export default function ReportViewer() {
       )}
 
       <Dialog open={diffView != null} onOpenChange={(o) => !o && setDiffView(null)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-7xl">
           <DialogHeader>
             <DialogTitle>{diffView?.page}</DialogTitle>
           </DialogHeader>
           {diffView && (
-            <DiffSlider
+            <FullPageDiff
               baselineUrl={getImageUrl('baseline', diffView.page)}
               currentUrl={getImageUrl('current', diffView.page)}
-              label="Drag to compare Baseline vs Current"
+              diffUrl={getImageUrl('diff', diffView.page)}
+              regions={diffRegions}
             />
           )}
         </DialogContent>

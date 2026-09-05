@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { launchBrowser, openPage, takeScreenshot, a11yBaselinePath } from "./browser.js";
-import { compareScreenshots, CompareResult } from "./compare.js";
+import { launchBrowser, openPage, takeScreenshotForConfig, a11yBaselinePath, FullPageLimitError } from "./browser.js";
+import { CompareResult } from "./compare.js";
 import { generateReport } from "./reporter.js";
 import { AIAnalysisEngine, EnhancedCompareResult, rootCauseAnalyzer } from "./ai/index.js";
 import { a11yAnalyzer, A11yComparisonResult } from "./a11y/index.js";
@@ -13,12 +13,58 @@ import {
   PageConfig,
   IgnoreZone,
   readConfig,
+  CaptureMode,
+  captureModeFor,
+  fullPageMaxHeight,
   BASELINES_DIR,
   CURRENT_DIR,
   DIFFS_DIR,
   REPORTS_DIR,
   screenshotPath,
 } from "./config.js";
+
+function resolveCaptureMode(config: Config, pageConf: PageConfig): CaptureMode {
+  const env = process.env.FULLPAGE_MODE?.trim().toLowerCase();
+  if (env === "fullpage" || env === "full_page") return "fullPage";
+  if (env === "viewport" || env === "view") return "viewport";
+  return captureModeFor(pageConf, config);
+}
+
+function captureOptionsForPage(
+  config: Config,
+  pageConf: PageConfig,
+  mergedMask: string[]
+): { maskSelectors: string[]; keepVisibleSelectors: string[]; scrollableSelector?: string; maxHeight: number } {
+  return {
+    maskSelectors: mergedMask,
+    keepVisibleSelectors: (pageConf.fullPageKeepVisible ?? []).filter(Boolean),
+    scrollableSelector: pageConf.fullPageScrollable,
+    maxHeight: fullPageMaxHeight(config),
+  };
+}
+
+async function captureScreenshotForPage(
+  config: Config,
+  pageConf: PageConfig,
+  page: import("playwright").Page,
+  outputPath: string,
+  mergedMask: string[]
+): Promise<void> {
+  try {
+    await takeScreenshotForConfig(
+      page,
+      outputPath,
+      resolveCaptureMode(config, pageConf),
+      captureOptionsForPage(config, pageConf, mergedMask)
+    );
+  } catch (err) {
+    if (err instanceof FullPageLimitError) {
+      console.warn(`  ⚠️  ${err.message}`);
+      throw err;
+    }
+    throw err;
+  }
+}
 
 function collectIgnoreZones(config: Config, pageConf: PageConfig): {
   selectorSelectors: string[];
@@ -56,7 +102,9 @@ export async function runBaselineForPage(
       config.waitFor,
       pageConf.waitForSelector
     );
-    await takeScreenshot(
+    await captureScreenshotForPage(
+      config,
+      pageConf,
       page,
       screenshotPath(BASELINES_DIR, pageConf.name),
       mergedMask
@@ -90,7 +138,9 @@ export async function runBaseline(config: Config, pageNames?: string[]): Promise
         config.waitFor,
         pageConf.waitForSelector
       );
-      await takeScreenshot(
+      await captureScreenshotForPage(
+        config,
+        pageConf,
         page,
         screenshotPath(BASELINES_DIR, pageConf.name),
         mergedMask
@@ -130,7 +180,7 @@ export async function runTestForPage(
       config.waitFor,
       pageConf.waitForSelector
     );
-    await takeScreenshot(page, currentPath, mergedMask);
+    await captureScreenshotForPage(config, pageConf, page, currentPath, mergedMask);
     await page.close();
 
     // Use AI analysis engine
@@ -209,7 +259,7 @@ export async function runTest(config: Config, pageNames?: string[]): Promise<Enh
         config.waitFor,
         pageConf.waitForSelector
       );
-      await takeScreenshot(page, currentPath, mergedMask);
+      await captureScreenshotForPage(config, pageConf, page, currentPath, mergedMask);
 
       // Run accessibility analysis BEFORE closing page
       console.log(`  ♿ Running accessibility analysis...`);

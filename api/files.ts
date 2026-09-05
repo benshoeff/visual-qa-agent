@@ -91,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
   try {
-    const type = req.query.type as string; // baseline | current | diff | report
+    const type = req.query.type as string; // baseline | current | diff | regions | report
     const name = req.query.name as string;
     if (!type || !name) {
       res.status(400).setHeaders(corsHeaders()).json({ error: "type and name are required" });
@@ -107,6 +107,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res
         .status(200)
         .setHeader("Content-Type", "text/html; charset=utf-8")
+        .setHeader("Access-Control-Allow-Origin", "*")
+        .send(file.content);
+      return;
+    }
+
+    if (type === "regions") {
+      const file = await getFileText(`diffs/${name}.regions.json`);
+      if (!file) {
+        res.status(404).setHeaders(corsHeaders()).json({ error: "Diff regions not found" });
+        return;
+      }
+      res
+        .status(200)
+        .setHeader("Content-Type", "application/json")
         .setHeader("Access-Control-Allow-Origin", "*")
         .send(file.content);
       return;

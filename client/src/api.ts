@@ -25,12 +25,21 @@ export interface PageConfig {
   name: string
   url: string
   threshold?: number
+  captureMode?: 'viewport' | 'fullPage'
+  fullPageScrollable?: string
+  fullPageKeepVisible?: string[]
+}
+
+export interface FullPageConfig {
+  defaultMode: 'viewport' | 'fullPage'
+  maxHeight: number
 }
 
 export interface Config {
   viewport: { width: number; height: number }
   threshold: number
   pages: PageConfig[]
+  fullPage?: FullPageConfig
 }
 
 export interface CompareResult {
@@ -88,11 +97,22 @@ export type RunMode = 'test' | 'baseline' | 'crawl'
 
 export async function dispatchRun(
   mode: RunMode,
-  options: { pages?: string[]; url?: string; crawlConfig?: Record<string, unknown> } = {}
+  options: {
+    pages?: string[]
+    url?: string
+    crawlConfig?: Record<string, unknown>
+    fullPageMode?: 'page-default' | 'viewport' | 'fullPage'
+  } = {}
 ): Promise<{ success: boolean; message: string }> {
   return request('/api/dispatch', {
     method: 'POST',
-    body: JSON.stringify({ mode, pages: options.pages, url: options.url, crawlConfig: options.crawlConfig }),
+    body: JSON.stringify({
+      mode,
+      pages: options.pages,
+      url: options.url,
+      crawlConfig: options.crawlConfig,
+      fullPageMode: options.fullPageMode,
+    }),
   })
 }
 
@@ -135,6 +155,26 @@ export function getReportUrl(filename: string): string {
 
 export function getImageUrl(type: 'baseline' | 'current' | 'diff', name: string): string {
   return `/api/files?type=${type}&name=${encodeURIComponent(name)}`
+}
+
+export interface DiffRegion {
+  y: number
+  height: number
+}
+
+export interface DiffRegionsFile {
+  pageName: string
+  regions: DiffRegion[]
+}
+
+export async function getDiffRegions(pageName: string): Promise<DiffRegionsFile | null> {
+  try {
+    return await request<DiffRegionsFile>(
+      `/api/files?type=regions&name=${encodeURIComponent(pageName)}`
+    )
+  } catch {
+    return null
+  }
 }
 
 export async function fetchReportHtml(filename: string): Promise<string> {
