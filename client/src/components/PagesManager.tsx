@@ -7,6 +7,7 @@ import {
   Trash2,
   Camera,
   Play,
+  EyeOff,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getPages, addPage, updatePage, deletePage, dispatchRun, getImageUrl } from '../api'
@@ -255,6 +256,15 @@ export default function PagesManager() {
                             <Play />
                           )}
                           {loading === 'test' ? 'Running…' : 'Test'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => window.location.href = `/ignore-zones?page=${encodeURIComponent(p.name)}`}
+                          aria-label={`Ignore zones for ${p.name}`}
+                          title="Ignore Zones"
+                        >
+                          <EyeOff />
                         </Button>
                         <Button variant="ghost" size="icon-sm" onClick={() => startEdit(p)} aria-label={`Edit ${p.name}`}>
                           <Pencil />

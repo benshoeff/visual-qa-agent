@@ -1,11 +1,24 @@
 import fs from "fs";
 import path from "path";
 
+export interface IgnoreZone {
+  id: string;
+  name: string;
+  type: "bounding-box" | "selector";
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  selector?: string;
+  enabled: boolean;
+}
+
 export interface PageConfig {
   name: string;
   url: string;
   waitForSelector?: string;
   mask?: string[];
+  ignoreZones?: IgnoreZone[];
   threshold?: number;
 }
 
@@ -69,6 +82,7 @@ export interface Config {
   threshold: number;
   waitFor: "networkidle" | "domcontentloaded" | "load";
   pages: PageConfig[];
+  globalIgnoreZones?: IgnoreZone[];
   ai?: AIConfig;
   browsers?: BrowserProject[];
   performance?: PerformanceConfig;
@@ -174,6 +188,7 @@ export function readConfig(): Config {
   );
   return {
     ...config,
+    globalIgnoreZones: config.globalIgnoreZones ?? [],
     ai: { ...DEFAULT_AI_CONFIG, ...config.ai },
     performance: { ...DEFAULT_PERFORMANCE_CONFIG, ...config.performance },
     browsers: config.browsers ?? DEFAULT_BROWSER_PROJECTS,

@@ -22,6 +22,7 @@ import { commentsRouter } from "./routes/comments.js";
 import { approvalsRouter } from "./routes/approvals.js";
 import { auditLogRouter } from "./routes/auditLog.js";
 import { crawlRouter } from "./routes/crawl.js";
+import { ignoreZonesRouter } from "./routes/ignoreZones.js";
 
 export const router = Router();
 
@@ -32,6 +33,7 @@ router.use("/comments", commentsRouter);
 router.use("/approvals", approvalsRouter);
 router.use("/audit", auditLogRouter);
 router.use("/crawl", crawlRouter);
+router.use("/ignore-zones", ignoreZonesRouter);
 
 // ─── Config ──────────────────────────────────────────────────────────────
 

@@ -11,6 +11,7 @@ import { DatabaseService } from "./db/service.js";
 import {
   Config,
   PageConfig,
+  IgnoreZone,
   readConfig,
   BASELINES_DIR,
   CURRENT_DIR,
@@ -19,12 +20,32 @@ import {
   screenshotPath,
 } from "./config.js";
 
+function collectIgnoreZones(config: Config, pageConf: PageConfig): {
+  selectorSelectors: string[];
+  boundingBoxZones: IgnoreZone[];
+} {
+  const allZones = [
+    ...(config.globalIgnoreZones ?? []),
+    ...(pageConf.ignoreZones ?? []),
+  ];
+  const selectorSelectors = allZones
+    .filter((z) => z.type === "selector" && z.enabled && z.selector)
+    .map((z) => z.selector!);
+  const boundingBoxZones = allZones.filter(
+    (z) => z.type === "bounding-box" && z.enabled
+  );
+  return { selectorSelectors, boundingBoxZones };
+}
+
 export async function runBaselineForPage(
   config: Config,
   pageConf: PageConfig
 ): Promise<void> {
   console.log(`\n📸 BASELINE – ${pageConf.name}`);
   fs.mkdirSync(BASELINES_DIR, { recursive: true });
+
+  const { selectorSelectors } = collectIgnoreZones(config, pageConf);
+  const mergedMask = [...(pageConf.mask ?? []), ...selectorSelectors];
 
   const browser = await launchBrowser();
   try {
@@ -38,7 +59,7 @@ export async function runBaselineForPage(
     await takeScreenshot(
       page,
       screenshotPath(BASELINES_DIR, pageConf.name),
-      pageConf.mask
+      mergedMask
     );
     await page.close();
   } finally {
@@ -59,6 +80,9 @@ export async function runBaseline(config: Config, pageNames?: string[]): Promise
   for (const pageConf of pages) {
     console.log(`\n[${pageConf.name}]`);
     try {
+      const { selectorSelectors } = collectIgnoreZones(config, pageConf);
+      const mergedMask = [...(pageConf.mask ?? []), ...selectorSelectors];
+
       const { page } = await openPage(
         browser,
         pageConf.url,
@@ -69,7 +93,7 @@ export async function runBaseline(config: Config, pageNames?: string[]): Promise
       await takeScreenshot(
         page,
         screenshotPath(BASELINES_DIR, pageConf.name),
-        pageConf.mask
+        mergedMask
       );
       await page.close();
     } catch (err) {
@@ -94,6 +118,9 @@ export async function runTestForPage(
   const baselinePath = screenshotPath(BASELINES_DIR, pageConf.name);
   const diffPath = screenshotPath(DIFFS_DIR, pageConf.name);
 
+  const { selectorSelectors, boundingBoxZones } = collectIgnoreZones(config, pageConf);
+  const mergedMask = [...(pageConf.mask ?? []), ...selectorSelectors];
+
   const browser = await launchBrowser();
   try {
     const { page, captureData } = await openPage(
@@ -103,7 +130,7 @@ export async function runTestForPage(
       config.waitFor,
       pageConf.waitForSelector
     );
-    await takeScreenshot(page, currentPath, pageConf.mask);
+    await takeScreenshot(page, currentPath, mergedMask);
     await page.close();
 
     // Use AI analysis engine
@@ -114,7 +141,8 @@ export async function runTestForPage(
       currentPath,
       diffPath,
       pageConf.threshold ?? config.threshold,
-      pageConf
+      pageConf,
+      boundingBoxZones
     );
 
     return result;
@@ -170,6 +198,9 @@ export async function runTest(config: Config, pageNames?: string[]): Promise<Enh
     const baselinePath = screenshotPath(BASELINES_DIR, pageConf.name);
     const diffPath = screenshotPath(DIFFS_DIR, pageConf.name);
 
+    const { selectorSelectors, boundingBoxZones } = collectIgnoreZones(config, pageConf);
+    const mergedMask = [...(pageConf.mask ?? []), ...selectorSelectors];
+
     try {
       const { page, captureData } = await openPage(
         browser,
@@ -178,7 +209,7 @@ export async function runTest(config: Config, pageNames?: string[]): Promise<Enh
         config.waitFor,
         pageConf.waitForSelector
       );
-      await takeScreenshot(page, currentPath, pageConf.mask);
+      await takeScreenshot(page, currentPath, mergedMask);
 
       // Run accessibility analysis BEFORE closing page
       console.log(`  ♿ Running accessibility analysis...`);
@@ -277,7 +308,8 @@ export async function runTest(config: Config, pageNames?: string[]): Promise<Enh
         currentPath,
         diffPath,
         pageConf.threshold ?? config.threshold,
-        pageConf
+        pageConf,
+        boundingBoxZones
       );
 
       // Attach a11y data to result

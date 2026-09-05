@@ -13,6 +13,7 @@ import {
   Monitor,
   Sparkles,
   History,
+  EyeOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -35,6 +36,7 @@ const links = [
   { to: '/history', label: 'Run History', icon: History },
   { to: '/schedules', label: 'Schedules', icon: Clock },
   { to: '/reports', label: 'Reports', icon: FileBarChart2 },
+  { to: '/ignore-zones', label: 'Ignore Zones', icon: EyeOff },
 ]
 
 function ThemeToggle() {
