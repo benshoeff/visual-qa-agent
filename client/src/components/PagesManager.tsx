@@ -32,6 +32,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 const emptyPage = (): PageConfig => ({ name: '', url: '' })
 
@@ -210,6 +211,11 @@ export default function PagesManager() {
                     </TableCell>
                     <TableCell>
                       <span className="font-medium">{p.name}</span>
+                      {p.captureMode && (
+                        <Badge variant="outline" className="ml-2">
+                          {p.captureMode === 'fullPage' ? 'Full page' : 'Viewport'}
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <a
@@ -290,7 +296,7 @@ export default function PagesManager() {
 
       {/* Add / Edit dialog */}
       <Dialog open={editing != null} onOpenChange={(o) => !o && closeEditor()}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{isNew ? 'Add Page' : 'Edit Page'}</DialogTitle>
             <DialogDescription>
@@ -343,6 +349,87 @@ export default function PagesManager() {
                   )
                 }
                 placeholder="e.g. 5"
+              />
+            </div>
+<div className="space-y-2">
+              <Label>Screenshot capture</Label>
+              <div className="flex items-center gap-1 rounded-lg border p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setEditing((prev) => prev && { ...prev, captureMode: undefined })}
+                  className={cn(
+                    'rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                    !editing?.captureMode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+                  )}
+                >
+                  Default
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditing((prev) => prev && { ...prev, captureMode: 'fullPage' })}
+                  className={cn(
+                    'rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                    editing?.captureMode === 'fullPage' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+                  )}
+                >
+                  Full Page
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditing((prev) => prev && { ...prev, captureMode: 'viewport' })}
+                  className={cn(
+                    'rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                    editing?.captureMode === 'viewport' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+                  )}
+                >
+                  Viewport
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Full page captures the entire scrollable page; by default the page uses the
+                global setting in config.json.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="page-scrollable">
+                Full-page scrollable selector{' '}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              <Input
+                id="page-scrollable"
+                value={editing?.fullPageScrollable ?? ''}
+                onChange={(e) =>
+                  setEditing((prev) => prev && { ...prev, fullPageScrollable: e.target.value || undefined })
+                }
+                placeholder="e.g. #chat-container"
+              />
+              <p className="text-xs text-muted-foreground">
+                Captures the full scrollable content of this inner container instead of the window.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="page-keep-visible">
+                Keep-visible selectors{' '}
+                <span className="font-normal text-muted-foreground">
+                  (optional, comma-separated) — elements to keep on screen when hiding fixed/sticky
+                </span>
+              </Label>
+              <Input
+                id="page-keep-visible"
+                value={(editing?.fullPageKeepVisible ?? []).join(', ')}
+                onChange={(e) =>
+                  setEditing((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          fullPageKeepVisible: e.target.value
+                            ? e.target.value.split(',').map((s) => s.trim()).filter(Boolean)
+                            : [],
+                        }
+                      : null
+                  )
+                }
+                placeholder="header, .modal"
               />
             </div>
             {error && (

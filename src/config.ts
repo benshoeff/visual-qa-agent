@@ -13,6 +13,8 @@ export interface IgnoreZone {
   enabled: boolean;
 }
 
+export type CaptureMode = "viewport" | "fullPage";
+
 export interface PageConfig {
   name: string;
   url: string;
@@ -20,6 +22,9 @@ export interface PageConfig {
   mask?: string[];
   ignoreZones?: IgnoreZone[];
   threshold?: number;
+  captureMode?: CaptureMode;
+  fullPageScrollable?: string;
+  fullPageKeepVisible?: string[];
 }
 
 export interface CrawlConfig {
@@ -40,6 +45,11 @@ export interface BrowserProject {
   userAgent?: string;
   locale?: string;
   timezoneId?: string;
+}
+
+export interface FullPageConfig {
+  defaultMode: CaptureMode;
+  maxHeight: number;
 }
 
 export interface AIConfig {
@@ -86,6 +96,7 @@ export interface Config {
   ai?: AIConfig;
   browsers?: BrowserProject[];
   performance?: PerformanceConfig;
+  fullPage?: Partial<FullPageConfig>;
 }
 
 const ROOT = process.cwd();
@@ -146,6 +157,11 @@ export const DEFAULT_BROWSER_PROJECTS: BrowserProject[] = [
   { name: "webkit-mobile", browser: "webkit", viewport: { width: 375, height: 667 }, isMobile: true, deviceScaleFactor: 2 },
 ];
 
+export const DEFAULT_FULLPAGE_CONFIG: FullPageConfig = {
+  defaultMode: "viewport",
+  maxHeight: 20000,
+};
+
 export const DEFAULT_CRAWL_CONFIG: CrawlConfig = {
   maxPages: 50,
   maxDepth: 3,
@@ -182,6 +198,15 @@ export function a11yBaselinePath(name: string) {
   return path.join(BASELINES_DIR, `${name}.a11y.json`);
 }
 
+export function captureModeFor(pageConf: PageConfig, config: Config): CaptureMode {
+  return pageConf.captureMode ?? config.fullPage?.defaultMode ?? DEFAULT_FULLPAGE_CONFIG.defaultMode;
+}
+
+export function fullPageMaxHeight(config: Config): number {
+  const maxHeight = config.fullPage?.maxHeight;
+  return typeof maxHeight === "number" && maxHeight > 0 ? maxHeight : DEFAULT_FULLPAGE_CONFIG.maxHeight;
+}
+
 export function readConfig(): Config {
   const config = JSON.parse(
     fs.readFileSync(path.join(ROOT, "config.json"), "utf-8")
@@ -192,6 +217,7 @@ export function readConfig(): Config {
     ai: { ...DEFAULT_AI_CONFIG, ...config.ai },
     performance: { ...DEFAULT_PERFORMANCE_CONFIG, ...config.performance },
     browsers: config.browsers ?? DEFAULT_BROWSER_PROJECTS,
+    fullPage: { ...DEFAULT_FULLPAGE_CONFIG, ...config.fullPage },
   };
 }
 

@@ -5,6 +5,10 @@
   },
   "threshold": 0.2,
   "waitFor": "networkidle",
+  "fullPage": {
+    "defaultMode": "viewport",
+    "maxHeight": 20000
+  },
   "pages": [
     {
       "name": "homepage",

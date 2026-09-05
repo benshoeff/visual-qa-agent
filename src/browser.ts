@@ -1,8 +1,12 @@
-import { chromium, firefox, webkit, Browser, BrowserType, Page, ConsoleMessage } from "playwright";
+import { chromium, firefox, webkit, Browser, BrowserType, Page, ConsoleMessage, Locator } from "playwright";
 import { injectAxe, getAxeResults } from "axe-playwright";
 import { A11yAnalysisResult } from "./a11y/index.js";
-import { BASELINES_DIR } from "./config.js";
+import { BASELINES_DIR, CaptureMode } from "./config.js";
 import path from "path";
+import fs from "fs";
+import { PNG } from "pngjs";
+
+export const DEFAULT_FULLPAGE_MAX_HEIGHT = 20000;
 
 export function a11yBaselinePath(name: string): string {
   return path.join(BASELINES_DIR, `${name}.a11y.json`);
@@ -243,11 +247,102 @@ async function captureDOMSnapshot(page: Page): Promise<DOMSnapshot> {
   });
 }
 
+export async function captureFullPageScreenshot(
+  page: Page,
+  outputPath: string,
+  options: {
+    maskSelectors?: string[];
+    keepVisibleSelectors?: string[];
+    scrollableSelector?: string;
+    maxHeight?: number;
+  } = {}
+): Promise<Buffer> {
+  const maxHeight = options.maxHeight ?? DEFAULT_FULLPAGE_MAX_HEIGHT;
+  const scrollableSelector = options.scrollableSelector?.trim() || undefined;
+
+  if (scrollableSelector) {
+    return takeScreenshot(page, outputPath, {
+      maskSelectors: options.maskSelectors,
+      keepVisibleSelectors: options.keepVisibleSelectors,
+      fullPage: true,
+      maxHeight,
+      scrollableSelector,
+    });
+  }
+
+  await preScrollForLazyContent(page, maxHeight);
+
+  const height = await page.evaluate(() =>
+    Math.max(
+      document.documentElement.scrollHeight,
+      document.body?.scrollHeight ?? 0
+    )
+  );
+
+  if (height > maxHeight) {
+    throw new FullPageLimitError(height, maxHeight);
+  }
+
+  console.log(`  📐 Full-page capture (${height}px tall)`);
+
+  return takeScreenshot(page, outputPath, {
+    maskSelectors: options.maskSelectors,
+    keepVisibleSelectors: options.keepVisibleSelectors,
+    fullPage: true,
+    maxHeight,
+  });
+}
+
+export async function takeScreenshotForConfig(
+  page: Page,
+  outputPath: string,
+  mode: CaptureMode,
+  options: {
+    maskSelectors?: string[];
+    keepVisibleSelectors?: string[];
+    scrollableSelector?: string;
+    maxHeight?: number;
+  } = {}
+): Promise<Buffer> {
+  if (mode === "fullPage") {
+    return captureFullPageScreenshot(page, outputPath, options);
+  }
+  return takeScreenshot(page, outputPath, { maskSelectors: options.maskSelectors });
+}
+
+export class FullPageLimitError extends Error {
+  constructor(
+    public readonly pageHeight: number,
+    public readonly maxHeight: number
+  ) {
+    super(
+      `Page height ${pageHeight}px exceeds full-page capture limit of ${maxHeight}px. ` +
+        `Increase "fullPage.maxHeight" or switch the page to "viewport" capture.`
+    );
+    this.name = "FullPageLimitError";
+  }
+}
+
+export interface ScreenshotOptions {
+  maskSelectors?: string[];
+  fullPage?: boolean;
+  maxHeight?: number;
+  keepVisibleSelectors?: string[];
+  scrollableSelector?: string;
+}
+
 export async function takeScreenshot(
   page: Page,
   outputPath: string,
-  maskSelectors: string[] = []
+  options: ScreenshotOptions = {}
 ): Promise<Buffer> {
+  const {
+    maskSelectors = [],
+    fullPage = false,
+    keepVisibleSelectors = [],
+    scrollableSelector,
+  } = options;
+
   if (maskSelectors.length > 0) {
     await page.evaluate((selectors) => {
       selectors.forEach((selector) => {
@@ -259,9 +354,233 @@ export async function takeScreenshot(
     }, maskSelectors);
   }
 
-  const screenshot = await page.screenshot({ path: outputPath || undefined, fullPage: false });
-  console.log(`  → Saved: ${outputPath || "buffer"}`);
-  return screenshot;
+  let restoreFixedSticky: (() => Promise<void>) | null = null;
+
+  try {
+    if (fullPage) {
+      restoreFixedSticky = await hideFixedSticky(page, [
+        ...keepVisibleSelectors,
+        ...maskSelectors,
+      ]);
+    }
+
+    let screenshot: Buffer;
+    if (fullPage && scrollableSelector) {
+      screenshot = await captureScrollableElement(
+        page,
+        page.locator(scrollableSelector),
+        options.maxHeight ?? DEFAULT_FULLPAGE_MAX_HEIGHT,
+        outputPath
+      );
+    } else {
+      screenshot = await page.screenshot({
+        path: outputPath || undefined,
+        fullPage,
+      });
+    }
+    console.log(
+      `  → Saved: ${outputPath || "buffer"}${fullPage ? " (full page)" : ""}`
+    );
+    return screenshot;
+  } finally {
+    if (restoreFixedSticky) {
+      await restoreFixedSticky();
+    }
+  }
+}
+
+async function captureScrollableElement(
+  page: Page,
+  locator: Locator,
+  maxHeight: number,
+  outputPath?: string
+): Promise<Buffer> {
+  const info = await locator.evaluate((el) => {
+    const rect = el.getBoundingClientRect();
+    return {
+      scrollHeight: el.scrollHeight,
+      clientWidth: el.clientWidth,
+      scrollTop: el.scrollTop,
+      scrollLeft: el.scrollLeft,
+      elementTop: rect.top + window.scrollY,
+      elementLeft: rect.left + window.scrollX,
+    };
+  });
+
+  if (info.scrollHeight > maxHeight) {
+    throw new FullPageLimitError(info.scrollHeight, maxHeight);
+  }
+
+  console.log(
+    `  📐 Capturing scrollable container (${info.scrollHeight}px tall)`
+  );
+
+  await locator.evaluate(
+    (el, top) => {
+      el.scrollTop = 0;
+      el.scrollLeft = 0;
+      window.scrollTo(0, Math.max(0, top - 1));
+    },
+    info.elementTop
+  );
+  await page.waitForTimeout(80);
+
+  const slices: Array<{ buffer: Buffer; offsetY: number }> = [];
+  let offset = 0;
+  while (offset < info.scrollHeight) {
+    await locator.evaluate((el, o) => {
+      el.scrollTop = o;
+    }, offset);
+    await page.waitForTimeout(60);
+
+    const box = await locator.boundingBox();
+    if (!box) {
+      throw new Error(`Scrollable container not visible: ${locator}`);
+    }
+    const clipH = Math.max(1, Math.floor(Math.min(box.height, info.scrollHeight - offset)));
+    const buffer = await page.screenshot({
+      clip: {
+        x: Math.max(0, Math.floor(box.x)),
+        y: Math.max(0, Math.floor(box.y)),
+        width: Math.max(1, Math.floor(box.width)),
+        height: clipH,
+      },
+    });
+    slices.push({ buffer, offsetY: offset });
+    offset += Math.max(1, clipH - 8);
+    if (slices.length > Math.max(2, Math.ceil(maxHeight / 100))) break;
+  }
+
+  if (slices.length === 0) {
+    throw new Error(`No slices captured for scrollable container: ${locator}`);
+  }
+
+  return stitchSlices(slices, info.scrollHeight, outputPath);
+}
+
+function stitchSlices(
+  slices: Array<{ buffer: Buffer; offsetY: number }>,
+  totalHeight: number,
+  outputPath?: string
+): Buffer {
+  const decoded = slices.map((s) => PNG.sync.read(s.buffer));
+  const width = decoded.reduce((w, d) => Math.max(w, d.width), 0);
+  if (width === 0) {
+    throw new Error("Capture failed: zero-width slices produced by the browser");
+  }
+  const height = Math.max(1, totalHeight);
+  const canvas = new PNG({ width, height });
+
+  for (let i = 0; i < slices.length; i++) {
+    const data = decoded[i];
+    const dstStart = Math.round(slices[i].offsetY);
+    for (let y = 0; y < data.height; y++) {
+      const dst = dstStart + y;
+      if (dst >= height) break;
+      const srcRow = y * data.width * 4;
+      const dstRow = dst * width * 4;
+      for (let px = 0; px < width * 4; px++) {
+        canvas.data[dstRow + px] =
+          px < data.width * 4 ? data.data[srcRow + px] : 0;
+      }
+    }
+  }
+
+  const buffer = PNG.sync.write(canvas);
+  if (outputPath) {
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, buffer);
+  }
+  return buffer;
+}
+
+async function preScrollForLazyContent(
+  page: Page,
+  maxHeight: number
+): Promise<void> {
+  const viewportHeight =
+    (await page.evaluate(() => window.innerHeight)) || 720;
+  const steps = Math.min(80, Math.ceil(maxHeight / viewportHeight));
+
+  console.log(`  ♻️  Pre-scrolling to trigger lazy content (${steps} steps)`);
+
+  for (let i = 1; i <= steps; i++) {
+    await page.evaluate((y) => window.scrollTo(0, y), i * viewportHeight);
+    if (i % 3 === 0) {
+      await page
+        .waitForLoadState("networkidle", { timeout: 3000 })
+        .catch(() => {});
+    }
+    await page.waitForTimeout(120);
+  }
+
+  await page.evaluate(() =>
+    window.scrollTo(0, document.documentElement.scrollHeight)
+  );
+  await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
+
+  await page.evaluate(async () => {
+    for (let i = 0; i < 30; i++) {
+      const pendingImages = Array.from(document.images).filter(
+        (img) => !img.complete || img.naturalWidth === 0
+      ).length;
+      if (pendingImages === 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  });
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(150);
+}
+
+async function hideFixedSticky(
+  page: Page,
+  keepVisibleSelectors: string[]
+): Promise<() => Promise<void>> {
+  const hiddenCount = await page.evaluate((keepSelectors) => {
+    const keep = new Set<Element>();
+    for (const selector of keepSelectors) {
+      document.querySelectorAll(selector).forEach((el) => keep.add(el));
+    }
+
+    const affected: HTMLElement[] = [];
+    const all = document.querySelectorAll("body *");
+    for (const el of all) {
+      if (!(el instanceof HTMLElement)) continue;
+      const pos = getComputedStyle(el).position;
+      if (pos !== "fixed" && pos !== "sticky") continue;
+
+      let node: HTMLElement | null = el;
+      let keepIt = false;
+      while (node && !keepIt) {
+        if (keep.has(node)) keepIt = true;
+        node = node.parentElement;
+      }
+      if (keepIt) continue;
+
+      el.dataset.vqaOrigVisibility = el.style.visibility;
+      el.style.visibility = "hidden";
+      affected.push(el);
+    }
+    return affected.length;
+  }, keepVisibleSelectors);
+
+  if (hiddenCount > 0) {
+    console.log(
+      `  🧷 Hid ${hiddenCount} fixed/sticky element(s) during full-page capture`
+    );
+  }
+
+  return async () => {
+    await page.evaluate(() => {
+      document.querySelectorAll("[data-vqa-orig-visibility]").forEach((el) => {
+        if (el instanceof HTMLElement) {
+          el.style.visibility = el.dataset.vqaOrigVisibility || "";
+          delete el.dataset.vqaOrigVisibility;
+        }
+      });
+    });
+  };
 }
 
 export function computeDOMSnapshotDiff(baseline: DOMSnapshot, current: DOMSnapshot) {
@@ -316,7 +635,7 @@ export async function capturePageData(
 ): Promise<PageCaptureData> {
   const { page, captureData } = await openPage(browser, url, viewport, waitFor, waitForSelector);
   try {
-    const screenshot = await takeScreenshot(page, "", maskSelectors);
+    const screenshot = await takeScreenshot(page, "", { maskSelectors });
     captureData.screenshot = screenshot;
     
     if (runA11y) {

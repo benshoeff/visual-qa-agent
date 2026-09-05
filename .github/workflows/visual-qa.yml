@@ -42,6 +42,15 @@ on:
         required: false
         default: ''
         type: string
+      fullpage_mode:
+        description: Screenshot capture mode ('page-default', 'fullPage', or 'viewport')
+        required: false
+        default: 'page-default'
+        type: choice
+        options:
+          - page-default
+          - fullPage
+          - viewport
 
 permissions:
   contents: write
@@ -85,6 +94,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode != 'crawl'
         env:
           PAGES: ${{ github.event.inputs.pages }}
+          FULLPAGE_MODE: ${{ github.event.inputs.fullpage_mode }}
         run: npm run ${{ github.event.inputs.mode }}
 
       # When re-capturing baselines, old current/diffs are stale — remove them.

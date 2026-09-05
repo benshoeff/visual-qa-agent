@@ -38,6 +38,7 @@ export default function TestRunner() {
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set())
   const [runStatus, setRunStatus] = useState<RunStatus | null>(null)
   const [runSummary, setRunSummary] = useState<PageResult[]>([])
+  const [fullPageMode, setFullPageMode] = useState<'page-default' | 'viewport' | 'fullPage'>('page-default')
   const polling = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadSummary = async () => {
@@ -59,7 +60,7 @@ export default function TestRunner() {
   useEffect(() => {
     getPages().then(setPages).catch(() => {})
     getRunStatus().then((runs) => setRunStatus(runs[0] ?? null)).catch(() => {})
-    loadSummary()
+    Promise.resolve().then(loadSummary)
   }, [])
 
   useEffect(() => {
@@ -118,7 +119,7 @@ export default function TestRunner() {
     setLoading(mode)
     setRunStatus(null)
     try {
-      await dispatchRun(mode, { pages: names })
+      await dispatchRun(mode, { pages: names, fullPageMode })
       startPolling()
     } catch (e) {
       setError((e as Error).message)
@@ -131,8 +132,20 @@ export default function TestRunner() {
 
   const summaryPassed = runSummary.filter((r) => r.passed).length
   const summaryFailed = runSummary.filter((r) => !r.passed && r.errored).length
-  const summaryFailedNotErrored = runSummary.filter((r) => !r.passed && !r.errored).length
-  const summaryFailedCount = summaryFailed + summaryFailedNotErrored
+
+  const latestByPage = useMemo(
+    () =>
+      runSummary.map((r) => ({
+        page: r.pageName,
+        status: r.errored
+          ? 'ERROR'
+          : r.passed
+            ? 'PASSED'
+            : 'FAILED',
+        diffPercent: r.diffPercent,
+      })),
+    [runSummary]
+  )
 
   return (
     <div className="space-y-6">
@@ -203,6 +216,38 @@ export default function TestRunner() {
 
       <Card>
         <CardContent className="flex flex-wrap items-center gap-3 py-5">
+          <div className="flex items-center gap-1 rounded-lg border p-0.5" title="Screenshot capture mode for this run (overrides page defaults)">
+            <button
+              type="button"
+              onClick={() => setFullPageMode('page-default')}
+              className={cn(
+                'rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                fullPageMode === 'page-default' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+              )}
+            >
+              Page Default
+            </button>
+            <button
+              type="button"
+              onClick={() => setFullPageMode('fullPage')}
+              className={cn(
+                'rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                fullPageMode === 'fullPage' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+              )}
+            >
+              Full Page
+            </button>
+            <button
+              type="button"
+              onClick={() => setFullPageMode('viewport')}
+              className={cn(
+                'rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                fullPageMode === 'viewport' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+              )}
+            >
+              Viewport
+            </button>
+          </div>
           <Button
             onClick={() => handleRun('baseline')}
             disabled={loading !== null || selectedPages.size === 0}

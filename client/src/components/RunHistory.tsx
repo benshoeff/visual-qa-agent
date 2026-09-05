@@ -12,11 +12,11 @@ import {
   FileBarChart2,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { getReports, fetchReportHtml, getImageUrl } from '../api'
+import { getReports, fetchReportHtml, getImageUrl, getDiffRegions, type DiffRegion } from '../api'
 import type { ReportFile } from '../api'
 import { parseReport } from '@/lib/reportParser'
 import type { PageResult, ReportSummary } from '@/lib/reportParser'
-import DiffSlider from './DiffSlider'
+import FullPageDiff from './FullPageDiff'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -79,6 +79,7 @@ export default function RunHistory() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pass' | 'fail'>('all')
   const [expandedRun, setExpandedRun] = useState<string | null>(null)
   const [diffView, setDiffView] = useState<{ page: string } | null>(null)
+  const [diffRegions, setDiffRegions] = useState<DiffRegion[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -250,7 +251,11 @@ export default function RunHistory() {
                           expandedRun === r.file.filename ? null : r.file.filename
                         )
                       }
-                      onCompare={(page) => setDiffView({ page })}
+                      onCompare={(page) => {
+                        setDiffView({ page })
+                        setDiffRegions([])
+                        getDiffRegions(page).then((data) => setDiffRegions(data?.regions ?? []))
+                      }}
                     />
                   )
                 })}
@@ -269,15 +274,16 @@ export default function RunHistory() {
       </Card>
 
       <Dialog open={diffView != null} onOpenChange={(o) => !o && setDiffView(null)}>
-        <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-auto">
+        <DialogContent className="max-w-7xl">
           <DialogHeader>
             <DialogTitle>{diffView?.page}</DialogTitle>
           </DialogHeader>
           {diffView && (
-            <DiffSlider
+            <FullPageDiff
               baselineUrl={getImageUrl('baseline', diffView.page)}
               currentUrl={getImageUrl('current', diffView.page)}
-              label="Drag to compare Baseline vs Current"
+              diffUrl={getImageUrl('diff', diffView.page)}
+              regions={diffRegions}
             />
           )}
         </DialogContent>

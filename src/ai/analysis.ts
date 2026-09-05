@@ -3,7 +3,7 @@ import path from "path";
 import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
 import { OllamaVisionClient, buildVisionPrompt } from "./index.js";
-import { CompareResult } from "../compare.js";
+import { CompareResult, DiffRegion, computeDiffRegions, normalizeImages, writeDiffRegions } from "../compare.js";
 import { PageConfig, IgnoreZone, BASELINES_DIR, CURRENT_DIR, DIFFS_DIR, screenshotPath } from "../config.js";
 
 export interface VisionAnalysis {
@@ -186,21 +186,11 @@ export class AIAnalysisEngine {
     const baselineImg = PNG.sync.read(fs.readFileSync(baselinePath));
     const currentImg = PNG.sync.read(fs.readFileSync(currentPath));
 
-    if (baselineImg.width !== currentImg.width || baselineImg.height !== currentImg.height) {
-      return {
-        pageName,
-        passed: false,
-        diffPixels: 0,
-        totalPixels: 0,
-        diffPercent: 0,
-        baselinePath,
-        currentPath,
-        diffPath: null,
-        error: `Size mismatch: baseline ${baselineImg.width}x${baselineImg.height} vs current ${currentImg.width}x${currentImg.height}`,
-      };
-    }
+    const { a: baselineNorm, b: currentNorm, width, height } = normalizeImages(
+      baselineImg,
+      currentImg
+    );
 
-    const { width, height } = baselineImg;
     const pixels = width * height;
     const diffImg = new PNG({ width, height });
 
@@ -210,7 +200,7 @@ export class AIAnalysisEngine {
 
     if (boundingBoxZones.length > 0) {
       const NEUTRAL = [128, 128, 128, 255];
-      for (const img of [baselineImg, currentImg]) {
+      for (const img of [baselineNorm, currentNorm]) {
         for (const zone of boundingBoxZones) {
           if (zone.x == null || zone.y == null || zone.width == null || zone.height == null) continue;
           const x2 = Math.min(zone.x + zone.width, width);
@@ -229,8 +219,8 @@ export class AIAnalysisEngine {
     }
 
     const diffPixels = pixelmatch(
-      baselineImg.data,
-      currentImg.data,
+      baselineNorm.data,
+      currentNorm.data,
       diffImg.data,
       width,
       height,
@@ -248,6 +238,7 @@ export class AIAnalysisEngine {
     if (diffPixels > 0) {
       fs.mkdirSync(path.dirname(diffPath), { recursive: true });
       fs.writeFileSync(diffPath, PNG.sync.write(diffImg));
+      writeDiffRegions(pageName, computeDiffRegions(baselineNorm, currentNorm));
     }
 
     return {
