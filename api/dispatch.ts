@@ -72,6 +72,7 @@ interface DispatchInput {
   url?: string;
   crawlConfig?: Record<string, unknown>;
   fullPageMode?: "page-default" | "viewport" | "fullPage";
+  project?: string;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -97,6 +98,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         (body.fullPageMode === "viewport" || body.fullPageMode === "fullPage" || body.fullPageMode === "page-default")
       ) {
         inputs.fullpage_mode = body.fullPageMode;
+      }
+      if (body.project) {
+        inputs.project = body.project;
       }
 
       await dispatchWorkflow(inputs);

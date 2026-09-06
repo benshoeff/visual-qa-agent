@@ -5,7 +5,6 @@ import pixelmatch from "pixelmatch";
 import { OllamaVisionClient, buildVisionPrompt } from "./index.js";
 import { CompareResult, DiffRegion, computeDiffRegions, normalizeImages, writeDiffRegions } from "../compare.js";
 import { PageConfig, IgnoreZone, BASELINES_DIR, CURRENT_DIR, DIFFS_DIR, screenshotPath } from "../config.js";
-
 export interface VisionAnalysis {
   semanticPassed: boolean;
   classification: "VISUAL_ONLY" | "FUNCTIONAL" | "ACCESSIBILITY" | "DYNAMIC_CONTENT" | "UNKNOWN";
@@ -238,7 +237,7 @@ export class AIAnalysisEngine {
     if (diffPixels > 0) {
       fs.mkdirSync(path.dirname(diffPath), { recursive: true });
       fs.writeFileSync(diffPath, PNG.sync.write(diffImg));
-      writeDiffRegions(pageName, computeDiffRegions(baselineNorm, currentNorm));
+      writeDiffRegions(diffPath, pageName, computeDiffRegions(baselineNorm, currentNorm));
     }
 
     return {

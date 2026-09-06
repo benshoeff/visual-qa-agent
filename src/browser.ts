@@ -1,15 +1,25 @@
 import { chromium, firefox, webkit, Browser, BrowserType, Page, ConsoleMessage, Locator } from "playwright";
 import { injectAxe, getAxeResults } from "axe-playwright";
 import { A11yAnalysisResult } from "./a11y/index.js";
-import { BASELINES_DIR, CaptureMode } from "./config.js";
+import { CaptureMode } from "./config.js";
 import path from "path";
 import fs from "fs";
 import { PNG } from "pngjs";
 
 export const DEFAULT_FULLPAGE_MAX_HEIGHT = 20000;
 
-export function a11yBaselinePath(name: string): string {
-  return path.join(BASELINES_DIR, `${name}.a11y.json`);
+const HTML_CONTENT_TYPES = ["text/html", "application/xhtml+xml"];
+
+export async function assertNavigablePage(url: string): Promise<void> {
+  try {
+    const resp = await fetch(url, { method: "HEAD", redirect: "follow" });
+    const contentType = (resp.headers.get("content-type") ?? "").toLowerCase();
+    if (contentType && !HTML_CONTENT_TYPES.some((t) => contentType.includes(t))) {
+      throw new Error(`Skipping non-HTML resource (${contentType.split(";")[0]}): ${url}`);
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("Skipping non-HTML")) throw err;
+  }
 }
 
 export interface ViewportConfig {
@@ -154,7 +164,12 @@ export async function openPage(
     }
   });
 
+  page.on("download", (download) => {
+    console.warn(`  ⬇️ Skipping download (non-HTML resource): ${download.url()}`);
+  });
+
   console.log(`  → Opening: ${url}`);
+  await assertNavigablePage(url);
   await page.goto(url, { waitUntil: waitFor, timeout: 30000 });
 
   if (waitForSelector) {
@@ -699,7 +714,12 @@ export async function openPageWithProject(
     }
   });
 
+  page.on("download", (download) => {
+    console.warn(`  ⬇️ Skipping download (non-HTML resource): ${download.url()}`);
+  });
+
   console.log(`  → Opening [${project.name}]: ${url}`);
+  await assertNavigablePage(url);
   await page.goto(url, { waitUntil: waitFor, timeout: 30000 });
 
   if (waitForSelector) {

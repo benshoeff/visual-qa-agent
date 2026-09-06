@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { launchBrowser, openPage, takeScreenshotForConfig, a11yBaselinePath, FullPageLimitError } from "./browser.js";
+import { launchBrowser, openPage, takeScreenshotForConfig, FullPageLimitError, openPageWithProject } from "./browser.js";
 import { CompareResult } from "./compare.js";
 import { generateReport } from "./reporter.js";
 import { AIAnalysisEngine, EnhancedCompareResult, rootCauseAnalyzer } from "./ai/index.js";
@@ -10,6 +10,7 @@ import { performanceAnalyzer } from "./performance/index.js";
 import { DatabaseService } from "./db/service.js";
 import {
   Config,
+  ProjectConfig,
   PageConfig,
   IgnoreZone,
   readConfig,
@@ -21,17 +22,23 @@ import {
   DIFFS_DIR,
   REPORTS_DIR,
   screenshotPath,
+  reportPath,
+  perfBaselinePath,
+  a11yBaselinePath,
+  resolveProjectId,
+  getProject,
 } from "./config.js";
 
-function resolveCaptureMode(config: Config, pageConf: PageConfig): CaptureMode {
+function resolveCaptureMode(config: Config, project: ProjectConfig, pageConf: PageConfig): CaptureMode {
   const env = process.env.FULLPAGE_MODE?.trim().toLowerCase();
   if (env === "fullpage" || env === "full_page") return "fullPage";
   if (env === "viewport" || env === "view") return "viewport";
-  return captureModeFor(pageConf, config);
+  return captureModeFor(pageConf, project);
 }
 
 function captureOptionsForPage(
   config: Config,
+  project: ProjectConfig,
   pageConf: PageConfig,
   mergedMask: string[]
 ): { maskSelectors: string[]; keepVisibleSelectors: string[]; scrollableSelector?: string; maxHeight: number } {
@@ -39,12 +46,13 @@ function captureOptionsForPage(
     maskSelectors: mergedMask,
     keepVisibleSelectors: (pageConf.fullPageKeepVisible ?? []).filter(Boolean),
     scrollableSelector: pageConf.fullPageScrollable,
-    maxHeight: fullPageMaxHeight(config),
+    maxHeight: fullPageMaxHeight(project),
   };
 }
 
 async function captureScreenshotForPage(
   config: Config,
+  project: ProjectConfig,
   pageConf: PageConfig,
   page: import("playwright").Page,
   outputPath: string,
@@ -54,8 +62,8 @@ async function captureScreenshotForPage(
     await takeScreenshotForConfig(
       page,
       outputPath,
-      resolveCaptureMode(config, pageConf),
-      captureOptionsForPage(config, pageConf, mergedMask)
+      resolveCaptureMode(config, project, pageConf),
+      captureOptionsForPage(config, project, pageConf, mergedMask)
     );
   } catch (err) {
     if (err instanceof FullPageLimitError) {
@@ -66,12 +74,12 @@ async function captureScreenshotForPage(
   }
 }
 
-function collectIgnoreZones(config: Config, pageConf: PageConfig): {
+function collectIgnoreZones(project: ProjectConfig, pageConf: PageConfig): {
   selectorSelectors: string[];
   boundingBoxZones: IgnoreZone[];
 } {
   const allZones = [
-    ...(config.globalIgnoreZones ?? []),
+    ...(project.globalIgnoreZones ?? []),
     ...(pageConf.ignoreZones ?? []),
   ];
   const selectorSelectors = allZones
@@ -85,12 +93,13 @@ function collectIgnoreZones(config: Config, pageConf: PageConfig): {
 
 export async function runBaselineForPage(
   config: Config,
+  project: ProjectConfig,
   pageConf: PageConfig
 ): Promise<void> {
-  console.log(`\n📸 BASELINE – ${pageConf.name}`);
-  fs.mkdirSync(BASELINES_DIR, { recursive: true });
+  console.log(`\n📸 BASELINE – ${pageConf.name} [${project.id}]`);
+  fs.mkdirSync(path.join(BASELINES_DIR, project.id), { recursive: true });
 
-  const { selectorSelectors } = collectIgnoreZones(config, pageConf);
+  const { selectorSelectors } = collectIgnoreZones(project, pageConf);
   const mergedMask = [...(pageConf.mask ?? []), ...selectorSelectors];
 
   const browser = await launchBrowser();
@@ -98,15 +107,16 @@ export async function runBaselineForPage(
     const { page } = await openPage(
       browser,
       pageConf.url,
-      config.viewport,
-      config.waitFor,
+      project.viewport,
+      project.waitFor,
       pageConf.waitForSelector
     );
     await captureScreenshotForPage(
       config,
+      project,
       pageConf,
       page,
-      screenshotPath(BASELINES_DIR, pageConf.name),
+      screenshotPath(BASELINES_DIR, project.id, pageConf.name),
       mergedMask
     );
     await page.close();
@@ -115,34 +125,35 @@ export async function runBaselineForPage(
   }
 }
 
-export async function runBaseline(config: Config, pageNames?: string[]): Promise<void> {
+export async function runBaseline(config: Config, project: ProjectConfig, pageNames?: string[]): Promise<void> {
   console.log("\n📸 מצב BASELINE – צילום תמונות בסיס\n");
-  fs.mkdirSync(BASELINES_DIR, { recursive: true });
+  fs.mkdirSync(path.join(BASELINES_DIR, project.id), { recursive: true });
 
   const pages = pageNames
-    ? config.pages.filter((p) => pageNames.includes(p.name))
-    : config.pages;
+    ? project.pages.filter((p) => pageNames.includes(p.name))
+    : project.pages;
 
   const browser = await launchBrowser();
 
   for (const pageConf of pages) {
     console.log(`\n[${pageConf.name}]`);
     try {
-      const { selectorSelectors } = collectIgnoreZones(config, pageConf);
+      const { selectorSelectors } = collectIgnoreZones(project, pageConf);
       const mergedMask = [...(pageConf.mask ?? []), ...selectorSelectors];
 
       const { page } = await openPage(
         browser,
         pageConf.url,
-        config.viewport,
-        config.waitFor,
+        project.viewport,
+        project.waitFor,
         pageConf.waitForSelector
       );
       await captureScreenshotForPage(
         config,
+        project,
         pageConf,
         page,
-        screenshotPath(BASELINES_DIR, pageConf.name),
+        screenshotPath(BASELINES_DIR, project.id, pageConf.name),
         mergedMask
       );
       await page.close();
@@ -157,18 +168,19 @@ export async function runBaseline(config: Config, pageNames?: string[]): Promise
 
 export async function runTestForPage(
   config: Config,
+  project: ProjectConfig,
   pageConf: PageConfig
 ): Promise<EnhancedCompareResult> {
-  console.log(`\n🔍 TEST – ${pageConf.name}`);
-  fs.mkdirSync(CURRENT_DIR, { recursive: true });
-  fs.mkdirSync(DIFFS_DIR, { recursive: true });
-  fs.mkdirSync(REPORTS_DIR, { recursive: true });
+  console.log(`\n🔍 TEST – ${pageConf.name} [${project.id}]`);
+  fs.mkdirSync(path.join(CURRENT_DIR, project.id), { recursive: true });
+  fs.mkdirSync(path.join(DIFFS_DIR, project.id), { recursive: true });
+  fs.mkdirSync(path.join(REPORTS_DIR, project.id), { recursive: true });
 
-  const currentPath = screenshotPath(CURRENT_DIR, pageConf.name);
-  const baselinePath = screenshotPath(BASELINES_DIR, pageConf.name);
-  const diffPath = screenshotPath(DIFFS_DIR, pageConf.name);
+  const currentPath = screenshotPath(CURRENT_DIR, project.id, pageConf.name);
+  const baselinePath = screenshotPath(BASELINES_DIR, project.id, pageConf.name);
+  const diffPath = screenshotPath(DIFFS_DIR, project.id, pageConf.name);
 
-  const { selectorSelectors, boundingBoxZones } = collectIgnoreZones(config, pageConf);
+  const { selectorSelectors, boundingBoxZones } = collectIgnoreZones(project, pageConf);
   const mergedMask = [...(pageConf.mask ?? []), ...selectorSelectors];
 
   const browser = await launchBrowser();
@@ -176,11 +188,11 @@ export async function runTestForPage(
     const { page, captureData } = await openPage(
       browser,
       pageConf.url,
-      config.viewport,
-      config.waitFor,
+      project.viewport,
+      project.waitFor,
       pageConf.waitForSelector
     );
-    await captureScreenshotForPage(config, pageConf, page, currentPath, mergedMask);
+    await captureScreenshotForPage(config, project, pageConf, page, currentPath, mergedMask);
     await page.close();
 
     // Use AI analysis engine
@@ -190,7 +202,7 @@ export async function runTestForPage(
       baselinePath,
       currentPath,
       diffPath,
-      pageConf.threshold ?? config.threshold,
+      pageConf.threshold ?? project.threshold,
       pageConf,
       boundingBoxZones
     );
@@ -214,15 +226,15 @@ export async function runTestForPage(
   }
 }
 
-export async function runTest(config: Config, pageNames?: string[]): Promise<EnhancedCompareResult[]> {
+export async function runTest(config: Config, project: ProjectConfig, pageNames?: string[]): Promise<EnhancedCompareResult[]> {
   console.log("\n🔍 מצב TEST – בדיקה מול הבייסליין\n");
-  fs.mkdirSync(CURRENT_DIR, { recursive: true });
-  fs.mkdirSync(DIFFS_DIR, { recursive: true });
-  fs.mkdirSync(REPORTS_DIR, { recursive: true });
+  fs.mkdirSync(path.join(CURRENT_DIR, project.id), { recursive: true });
+  fs.mkdirSync(path.join(DIFFS_DIR, project.id), { recursive: true });
+  fs.mkdirSync(path.join(REPORTS_DIR, project.id), { recursive: true });
 
   const pages = pageNames
-    ? config.pages.filter((p) => pageNames.includes(p.name))
-    : config.pages;
+    ? project.pages.filter((p) => pageNames.includes(p.name))
+    : project.pages;
 
   // Initialize database (optional)
   const useDatabase = !!process.env.DATABASE_URL;
@@ -244,26 +256,26 @@ export async function runTest(config: Config, pageNames?: string[]): Promise<Enh
 
   for (const pageConf of pages) {
     console.log(`\n[${pageConf.name}]`);
-    const currentPath = screenshotPath(CURRENT_DIR, pageConf.name);
-    const baselinePath = screenshotPath(BASELINES_DIR, pageConf.name);
-    const diffPath = screenshotPath(DIFFS_DIR, pageConf.name);
+    const currentPath = screenshotPath(CURRENT_DIR, project.id, pageConf.name);
+    const baselinePath = screenshotPath(BASELINES_DIR, project.id, pageConf.name);
+    const diffPath = screenshotPath(DIFFS_DIR, project.id, pageConf.name);
 
-    const { selectorSelectors, boundingBoxZones } = collectIgnoreZones(config, pageConf);
+    const { selectorSelectors, boundingBoxZones } = collectIgnoreZones(project, pageConf);
     const mergedMask = [...(pageConf.mask ?? []), ...selectorSelectors];
 
     try {
       const { page, captureData } = await openPage(
         browser,
         pageConf.url,
-        config.viewport,
-        config.waitFor,
+        project.viewport,
+        project.waitFor,
         pageConf.waitForSelector
       );
-      await captureScreenshotForPage(config, pageConf, page, currentPath, mergedMask);
+      await captureScreenshotForPage(config, project, pageConf, page, currentPath, mergedMask);
 
       // Run accessibility analysis BEFORE closing page
       console.log(`  ♿ Running accessibility analysis...`);
-      const a11yResult = await a11yAnalyzer.analyzePage(page, pageConf.url, config.viewport);
+      const a11yResult = await a11yAnalyzer.analyzePage(page, pageConf.url, project.viewport);
       
       if (a11yResult.violations.length > 0) {
         const critical = a11yResult.violations.filter((v: any) => v.impact === "critical").length;
@@ -274,7 +286,7 @@ export async function runTest(config: Config, pageNames?: string[]): Promise<Enh
       }
 
       // Compare with baseline a11y if exists
-      const baselineA11yPath = a11yBaselinePath(pageConf.name);
+      const baselineA11yPath = a11yBaselinePath(project.id, pageConf.name);
       let a11yComparison: A11yComparisonResult | null = null;
       let aiA11y: any = null;
       if (fs.existsSync(baselineA11yPath)) {
@@ -296,13 +308,14 @@ export async function runTest(config: Config, pageNames?: string[]): Promise<Enh
         }
       } else {
         // Save as new baseline
+        fs.mkdirSync(path.dirname(baselineA11yPath), { recursive: true });
         fs.writeFileSync(baselineA11yPath, JSON.stringify(a11yResult, null, 2));
         console.log(`  ♿ Saved A11y baseline`);
       }
 
       // Run performance analysis BEFORE closing page
       console.log(`  📊 Running performance analysis...`);
-      const perfResult = await performanceAnalyzer.analyzePage(page, pageConf.url, config.viewport);
+      const perfResult = await performanceAnalyzer.analyzePage(page, pageConf.url, project.viewport);
       
       if (perfResult.budgetViolations.length > 0) {
         console.log(`  📊 Performance: ${perfResult.budgetViolations.length} budget violations`);
@@ -314,7 +327,7 @@ export async function runTest(config: Config, pageNames?: string[]): Promise<Enh
       }
 
       // Compare with baseline performance if exists
-      const baselinePerfPath = path.join(BASELINES_DIR, `${pageConf.name}.perf.json`);
+      const baselinePerfPath = perfBaselinePath(project.id, pageConf.name);
       let perfComparison: any = null;
       if (fs.existsSync(baselinePerfPath)) {
         try {
@@ -344,6 +357,7 @@ export async function runTest(config: Config, pageNames?: string[]): Promise<Enh
         }
       } else {
         // Save as new baseline
+        fs.mkdirSync(path.dirname(baselinePerfPath), { recursive: true });
         fs.writeFileSync(baselinePerfPath, JSON.stringify(perfResult, null, 2));
         console.log(`  📊 Saved Performance baseline`);
       }
@@ -357,7 +371,7 @@ export async function runTest(config: Config, pageNames?: string[]): Promise<Enh
         baselinePath,
         currentPath,
         diffPath,
-        pageConf.threshold ?? config.threshold,
+        pageConf.threshold ?? project.threshold,
         pageConf,
         boundingBoxZones
       );
@@ -375,7 +389,7 @@ export async function runTest(config: Config, pageNames?: string[]): Promise<Enh
         const rootCause = await rootCauseAnalyzer.analyze({
           pageName: pageConf.name,
           url: pageConf.url,
-          viewport: config.viewport,
+          viewport: project.viewport,
           visualDiff: {
             classification: result.aiAnalysis.classification,
             diffPercent: result.diffPercent,
@@ -403,7 +417,7 @@ export async function runTest(config: Config, pageNames?: string[]): Promise<Enh
       // Persist to database
       if (db) {
         try {
-          await db.saveTestRun(pageConf.name, result, config, result.aiMetadata);
+          await db.saveTestRun(project.id, pageConf.name, result, config, result.aiMetadata);
         } catch (dbErr) {
           console.warn(`  ⚠️  DB save failed: ${(dbErr as Error).message}`);
         }
@@ -450,8 +464,8 @@ export async function runTest(config: Config, pageNames?: string[]): Promise<Enh
   console.log(`\n${"─".repeat(40)}`);
   console.log(`סיכום: ${passed} עברו ✅  |  ${failed} נכשלו ❌`);
 
-  const reportPath = path.join(REPORTS_DIR, `report-${Date.now()}.html`);
-  generateReport(results, reportPath);
+  const outReportPath = reportPath(project.id);
+  generateReport(results, outReportPath);
 
   return results;
 }
@@ -462,15 +476,20 @@ async function main() {
   const mode = modeArg?.split("=")[1] ?? "test";
 
   const config = readConfig();
+  const project = getProject(config);
+  if (!project) {
+    console.error("❌ אין פרויקט מוגדר בקונפיג");
+    process.exit(1);
+  }
   const pagesEnv = process.env.PAGES;
   const pageNames = pagesEnv && pagesEnv.trim() !== "" && pagesEnv !== "all"
     ? pagesEnv.split(",").map((s) => s.trim()).filter(Boolean)
     : undefined;
 
   if (mode === "baseline") {
-    await runBaseline(config, pageNames);
+    await runBaseline(config, project, pageNames);
   } else if (mode === "test") {
-    const results = await runTest(config, pageNames);
+    const results = await runTest(config, project, pageNames);
     const failed = results.filter((r) => !r.passed).length;
     if (failed > 0) process.exit(1);
   } else {

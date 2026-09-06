@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import cron, { type ScheduledTask } from "node-cron";
-import { readConfig } from "./config.js";
+import { readConfig, getProject } from "./config.js";
 import { runBaseline, runTest } from "./agent.js";
 
 export interface Schedule {
@@ -10,6 +10,7 @@ export interface Schedule {
   cronExpression: string;
   mode: "baseline" | "test";
   enabled: boolean;
+  projectId?: string;
   createdAt: number;
   lastRun: number | null;
 }
@@ -104,10 +105,15 @@ function startScheduleJob(schedule: Schedule) {
     console.log(`\n⏰ Running scheduled job: ${schedule.name} (${schedule.mode})`);
     try {
       const config = readConfig();
+      const project = getProject(config, schedule.projectId);
+      if (!project) {
+        console.error(`   ❌ Scheduled "${schedule.name}": project not found (${schedule.projectId ?? "active"})`);
+        return;
+      }
       if (schedule.mode === "baseline") {
-        await runBaseline(config);
+        await runBaseline(config, project);
       } else {
-        const results = await runTest(config);
+        const results = await runTest(config, project);
         const passed = results.filter((r) => r.passed).length;
         const failed = results.filter((r) => !r.passed).length;
         console.log(`   📊 ${schedule.name}: ${passed} passed, ${failed} failed`);

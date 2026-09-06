@@ -29,6 +29,7 @@ export interface CrawlJob {
   status: CrawlJobStatus;
   startUrl: string;
   config: CrawlConfig;
+  projectId?: string;
   progress: {
     current: number;
     total: number;
@@ -45,6 +46,7 @@ export interface StartCrawlRequest {
   url: string;
   config?: Partial<CrawlConfig>;
   autoCaptureBaseline?: boolean;
+  projectId?: string;
 }
 
 export interface ConfirmBaselinesRequest {

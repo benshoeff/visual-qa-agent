@@ -1,114 +1,149 @@
 {
-  "viewport": {
-    "width": 1280,
-    "height": 720
-  },
-  "threshold": 0.2,
-  "waitFor": "networkidle",
-  "fullPage": {
-    "defaultMode": "viewport",
-    "maxHeight": 20000
-  },
-  "pages": [
+  "version": 2,
+  "activeProjectId": "my-site",
+  "projects": [
     {
-      "name": "homepage",
-      "url": "https://qa-sandbox-app.vercel.app/",
-      "mask": [],
+      "id": "default",
+      "name": "qa-sandbox-app.vercel.app",
+      "baseUrl": "https://qa-sandbox-app.vercel.app",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
       "threshold": 0.2,
-      "ignoreZones": []
+      "waitFor": "networkidle",
+      "pages": [
+        {
+          "name": "homepage",
+          "url": "https://qa-sandbox-app.vercel.app/",
+          "mask": [],
+          "threshold": 0.2,
+          "ignoreZones": []
+        },
+        {
+          "name": "users",
+          "url": "https://qa-sandbox-app.vercel.app/users",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "roles",
+          "url": "https://qa-sandbox-app.vercel.app/roles",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "permissions",
+          "url": "https://qa-sandbox-app.vercel.app/permissions",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "products",
+          "url": "https://qa-sandbox-app.vercel.app/products",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "categories",
+          "url": "https://qa-sandbox-app.vercel.app/categories",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "posts",
+          "url": "https://qa-sandbox-app.vercel.app/posts",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "tasks",
+          "url": "https://qa-sandbox-app.vercel.app/tasks",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "orders",
+          "url": "https://qa-sandbox-app.vercel.app/orders",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "customers",
+          "url": "https://qa-sandbox-app.vercel.app/customers",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "invoices",
+          "url": "https://qa-sandbox-app.vercel.app/invoices",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "tickets",
+          "url": "https://qa-sandbox-app.vercel.app/tickets",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "projects",
+          "url": "https://qa-sandbox-app.vercel.app/projects",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "reviews",
+          "url": "https://qa-sandbox-app.vercel.app/reviews",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "employees",
+          "url": "https://qa-sandbox-app.vercel.app/employees",
+          "mask": [],
+          "threshold": 0.2
+        },
+        {
+          "name": "departments",
+          "url": "https://qa-sandbox-app.vercel.app/departments",
+          "mask": [],
+          "threshold": 0.2
+        }
+      ],
+      "globalIgnoreZones": [],
+      "fullPage": {
+        "defaultMode": "viewport",
+        "maxHeight": 20000
+      }
     },
     {
-      "name": "users",
-      "url": "https://qa-sandbox-app.vercel.app/users",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "roles",
-      "url": "https://qa-sandbox-app.vercel.app/roles",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "permissions",
-      "url": "https://qa-sandbox-app.vercel.app/permissions",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "products",
-      "url": "https://qa-sandbox-app.vercel.app/products",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "categories",
-      "url": "https://qa-sandbox-app.vercel.app/categories",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "posts",
-      "url": "https://qa-sandbox-app.vercel.app/posts",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "tasks",
-      "url": "https://qa-sandbox-app.vercel.app/tasks",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "orders",
-      "url": "https://qa-sandbox-app.vercel.app/orders",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "customers",
-      "url": "https://qa-sandbox-app.vercel.app/customers",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "invoices",
-      "url": "https://qa-sandbox-app.vercel.app/invoices",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "tickets",
-      "url": "https://qa-sandbox-app.vercel.app/tickets",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "projects",
-      "url": "https://qa-sandbox-app.vercel.app/projects",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "reviews",
-      "url": "https://qa-sandbox-app.vercel.app/reviews",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "employees",
-      "url": "https://qa-sandbox-app.vercel.app/employees",
-      "mask": [],
-      "threshold": 0.2
-    },
-    {
-      "name": "departments",
-      "url": "https://qa-sandbox-app.vercel.app/departments",
-      "mask": [],
-      "threshold": 0.2
+      "id": "my-site",
+      "name": "My Site",
+      "baseUrl": "https://benshoeff.vercel.app/",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "threshold": 0.1,
+      "waitFor": "networkidle",
+      "pages": [
+        {
+          "name": "Home Page",
+          "url": "https://benshoeff.vercel.app/",
+          "captureMode": "fullPage",
+          "mask": []
+        }
+      ],
+      "globalIgnoreZones": [],
+      "fullPage": {
+        "defaultMode": "viewport",
+        "maxHeight": 20000
+      },
+      "createdAt": 1788612211159,
+      "updatedAt": 1788612211159
     }
   ],
-  "globalIgnoreZones": [],
   "ai": {
     "enabled": false,
     "model": "llama3.2-vision:11b",
@@ -126,6 +161,44 @@
       "[data-user-content]"
     ],
     "ignoreRegions": []
+  },
+  "performance": {
+    "enabled": false,
+    "budget": {
+      "lcp": 2500,
+      "fid": 100,
+      "cls": 0.1,
+      "fcp": 1800,
+      "ttfb": 800,
+      "inp": 200,
+      "performanceScore": 90
+    },
+    "thresholds": {
+      "lcp": {
+        "warning": 2500,
+        "error": 4000
+      },
+      "fid": {
+        "warning": 100,
+        "error": 300
+      },
+      "cls": {
+        "warning": 0.1,
+        "error": 0.25
+      },
+      "fcp": {
+        "warning": 1800,
+        "error": 3000
+      },
+      "inp": {
+        "warning": 200,
+        "error": 500
+      }
+    },
+    "lighthouseOptions": {
+      "formFactor": "desktop",
+      "throttling": "simulated"
+    }
   },
   "browsers": [
     {
@@ -172,43 +245,5 @@
       "isMobile": true,
       "deviceScaleFactor": 2
     }
-  ],
-  "performance": {
-    "enabled": false,
-    "budget": {
-      "lcp": 2500,
-      "fid": 100,
-      "cls": 0.1,
-      "fcp": 1800,
-      "ttfb": 800,
-      "inp": 200,
-      "performanceScore": 90
-    },
-    "thresholds": {
-      "lcp": {
-        "warning": 2500,
-        "error": 4000
-      },
-      "fid": {
-        "warning": 100,
-        "error": 300
-      },
-      "cls": {
-        "warning": 0.1,
-        "error": 0.25
-      },
-      "fcp": {
-        "warning": 1800,
-        "error": 3000
-      },
-      "inp": {
-        "warning": 200,
-        "error": 500
-      }
-    },
-    "lighthouseOptions": {
-      "formFactor": "desktop",
-      "throttling": "simulated"
-    }
-  }
+  ]
 }

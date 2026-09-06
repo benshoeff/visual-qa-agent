@@ -1,15 +1,16 @@
 import { Router, Request, Response } from "express";
 import { execSync } from "child_process";
-import { readConfig, PageConfig, BrowserProject } from "../config.js";
+import { readConfig, PageConfig, BrowserProject, getProject, ProjectConfig } from "../config.js";
 
 export const impactRouter = Router();
 
 // Map selectors to pages from config
-function getPageSelectors(): Map<string, string[]> {
+function getPageSelectors(project?: ProjectConfig): Map<string, string[]> {
   const config = readConfig();
   const map = new Map<string, string[]>();
+  const pages = project ? project.pages : config.projects.flatMap((p) => p.pages);
   
-  for (const page of config.pages) {
+  for (const page of pages) {
     // Default selectors based on common patterns
     const selectors = [
       `[data-testid="${page.name.toLowerCase()}"]`,
@@ -97,7 +98,8 @@ impactRouter.post("/analyze", async (req: Request, res: Response) => {
       return;
     }
     
-    const pageSelectors = getPageSelectors();
+    const project = getProject(readConfig(), req.query.project as string | undefined);
+    const pageSelectors = getPageSelectors(project);
     const analysis = analyzeFileImpact(files, pageSelectors);
     
     // Filter by confidence threshold
@@ -119,7 +121,7 @@ impactRouter.post("/analyze", async (req: Request, res: Response) => {
 });
 
 // Get impact from last commit
-impactRouter.get("/last-commit", async (_req: Request, res: Response) => {
+impactRouter.get("/last-commit", async (req: Request, res: Response) => {
   try {
     const output = execSync("git diff --name-only HEAD~1 HEAD", { 
       encoding: "utf-8",
@@ -132,7 +134,8 @@ impactRouter.get("/last-commit", async (_req: Request, res: Response) => {
       return;
     }
     
-    const pageSelectors = getPageSelectors();
+    const project = getProject(readConfig(), req.query.project as string | undefined);
+    const pageSelectors = getPageSelectors(project);
     const analysis = analyzeFileImpact(files, pageSelectors);
     const affected = analysis.filter(a => a.confidence >= 0.5);
     
@@ -164,7 +167,8 @@ impactRouter.get("/compare/:baseRef/:headRef", async (req: Request, res: Respons
       return;
     }
     
-    const pageSelectors = getPageSelectors();
+    const project = getProject(readConfig(), req.query.project as string | undefined);
+    const pageSelectors = getPageSelectors(project);
     const analysis = analyzeFileImpact(files, pageSelectors);
     const affected = analysis.filter(a => a.confidence >= 0.5);
     

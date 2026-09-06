@@ -1,0 +1,69 @@
+{
+  "id": "88978e49-22b0-452c-9c97-361e294a8fef",
+  "status": "completed",
+  "startUrl": "https://benshoeff.vercel.app/",
+  "config": {
+    "maxPages": 50,
+    "maxDepth": 3,
+    "sameDomainOnly": true,
+    "excludePatterns": [
+      "/login",
+      "/signup",
+      "/signin",
+      "/admin",
+      "/api",
+      "/auth",
+      "/cart",
+      "/checkout",
+      "/account",
+      "/password",
+      "/reset",
+      "/verify",
+      "/logout",
+      "/oauth",
+      "/callback",
+      "/webhook",
+      "/.well-known"
+    ],
+    "waitFor": "networkidle",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "progress": {
+    "current": 2,
+    "total": 2,
+    "currentUrl": "https://benshoeff.vercel.app/Kobi_Ben-Shoeff_QA_Engineer_CV.pdf"
+  },
+  "discoveredPages": [
+    {
+      "url": "https://benshoeff.vercel.app/",
+      "name": "homepage",
+      "depth": 0
+    },
+    {
+      "url": "https://benshoeff.vercel.app/Kobi_Ben-Shoeff_QA_Engineer_CV.pdf",
+      "name": "Kobi_Ben-Shoeff_QA_Engineer_CV",
+      "depth": 1,
+      "parentUrl": "https://benshoeff.vercel.app/"
+    }
+  ],
+  "results": [
+    {
+      "pageName": "homepage",
+      "url": "https://benshoeff.vercel.app/",
+      "success": true,
+      "baselinePath": "/Users/benshoeff/Desktop/visual-qa-agent/visual-qa-agent/baselines/my-site/homepage.png"
+    },
+    {
+      "pageName": "Kobi_Ben-Shoeff_QA_Engineer_CV",
+      "url": "https://benshoeff.vercel.app/Kobi_Ben-Shoeff_QA_Engineer_CV.pdf",
+      "success": false,
+      "error": "page.goto: Download is starting\nCall log:\n  - navigating to \"https://benshoeff.vercel.app/Kobi_Ben-Shoeff_QA_Engineer_CV.pdf\", waiting until \"networkidle\"\n"
+    }
+  ],
+  "projectId": "my-site",
+  "createdAt": "2026-09-05T12:44:39.202Z",
+  "updatedAt": "2026-09-05T12:44:44.011Z"
+}

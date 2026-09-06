@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import { useProject } from '@/contexts/ProjectContext'
 import {
   Table,
   TableBody,
@@ -56,6 +57,8 @@ interface EditorState {
 }
 
 export default function ScheduleManager() {
+  const { project } = useProject()
+  const projectId = project?.id
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [editor, setEditor] = useState<EditorState | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Schedule | null>(null)
@@ -67,6 +70,8 @@ export default function ScheduleManager() {
   useEffect(() => {
     getSchedules().then(setSchedules).catch(() => toast.error('Failed to load schedules'))
   }, [])
+
+  const visibleSchedules = schedules.filter((s) => !s.projectId || s.projectId === projectId)
 
   const openNew = () => {
     setEditor({ isNew: true, name: '', cronExpression: '', mode: 'test', enabled: true })
@@ -107,6 +112,7 @@ export default function ScheduleManager() {
           cronExpression: editor.cronExpression,
           mode: editor.mode,
           enabled: editor.enabled,
+          projectId,
         })
         toast.success(`Schedule "${editor.name}" created`)
       } else if (editor.id) {
@@ -115,7 +121,7 @@ export default function ScheduleManager() {
           cronExpression: editor.cronExpression,
           mode: editor.mode,
           enabled: editor.enabled,
-        })
+        }, projectId)
         toast.success(`Schedule "${editor.name}" updated`)
       }
       closeEditor()
@@ -128,7 +134,7 @@ export default function ScheduleManager() {
   const handleDelete = async () => {
     if (!deleteTarget) return
     try {
-      await deleteSchedule(deleteTarget.id)
+      await deleteSchedule(deleteTarget.id, projectId)
       toast.success(`Schedule "${deleteTarget.name}" deleted`)
       setDeleteTarget(null)
       await refresh()
@@ -140,7 +146,7 @@ export default function ScheduleManager() {
 
   const toggleEnabled = async (s: Schedule) => {
     try {
-      await updateSchedule(s.id, { enabled: !s.enabled })
+      await updateSchedule(s.id, { enabled: !s.enabled }, s.projectId ?? projectId)
       await refresh()
     } catch (e) {
       toast.error((e as Error).message)
@@ -177,7 +183,7 @@ export default function ScheduleManager() {
         </div>
       )}
 
-      {schedules.length === 0 ? (
+      {visibleSchedules.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-20 text-center">
           <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
             <Clock className="size-6 text-primary" />
@@ -199,7 +205,7 @@ export default function ScheduleManager() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {schedules.map((s) => (
+              {visibleSchedules.map((s) => (
                 <TableRow key={s.id}>
                   <TableCell>
                     <span className="font-medium">{s.name}</span>

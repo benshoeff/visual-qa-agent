@@ -117,6 +117,7 @@ interface CrawlJobFile {
   status: "pending" | "running" | "completed" | "failed";
   startUrl: string;
   discoveredPages: DiscoveredPage[];
+  projectId?: string;
   error?: string;
   createdAt: string;
   updatedAt: string;
@@ -140,7 +141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // POST /api/crawl -> dispatch crawl workflow
     if (req.method === "POST" && req.query.confirm !== "true") {
-      const { url, config, autoCaptureBaseline } = req.body ?? {};
+      const { url, config, autoCaptureBaseline, projectId } = req.body ?? {};
       if (!url) {
         res.status(400).setHeaders(corsHeaders()).json({ error: "url is required" });
         return;
@@ -152,6 +153,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         crawl_config: config ? JSON.stringify(config) : "",
         auto_capture_baseline: autoCaptureBaseline === false ? "false" : "true",
         job_id: jobId,
+        project: projectId ?? "",
       });
       res.status(202).setHeaders(corsHeaders()).json({ jobId, status: "pending" });
       return;
@@ -196,34 +198,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
-      const configFile = await getFileText("config.json");
-      if (!configFile) {
-        res.status(500).setHeaders(corsHeaders()).json({ error: "config.json not found" });
+      const { loadConfig, saveConfig, getProject } = await import("./lib/config.js");
+      const config = await loadConfig();
+      const project = getProject(config, job.projectId);
+      if (!project) {
+        res.status(404).setHeaders(corsHeaders()).json({ error: "Project not found for crawl job" });
         return;
       }
-      const config = JSON.parse(configFile.content);
-      config.pages ??= [];
 
       let added = 0;
       let skipped = 0;
       for (const pageName of pageNames) {
         const dp = job.discoveredPages.find((p) => p.name === pageName);
         if (!dp) { skipped++; continue; }
-        if ((config.pages as Array<{ name: string }>).some((p) => p.name === pageName)) { skipped++; continue; }
-        config.pages.push({
+        if (project.pages.some((p) => p.name === pageName)) { skipped++; continue; }
+        project.pages.push({
           name: dp.name,
           url: dp.url,
           waitForSelector: undefined,
           mask: [],
-          threshold: config.threshold,
+          threshold: project.threshold,
         });
         added++;
       }
       if (added > 0) {
-        await commitFiles(
-          [{ path: "config.json", content: JSON.stringify(config, null, 2) }],
-          `Confirm ${added} page(s) from crawl ${id} via UI`
-        );
+        await saveConfig(config, `Confirm ${added} page(s) from crawl ${id} via UI`);
       }
       res.status(200).setHeaders(corsHeaders()).json({ added, skipped });
       return;
