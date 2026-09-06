@@ -15,8 +15,9 @@ for (const s of schedules) {
   }
   ran = true;
   const mode = s.mode === "baseline" ? "baseline" : "test";
-  console.log(`\n⏰ Scheduled "${s.name}" → ${s.mode}`);
-  execSync(`npm run ${mode}`, { stdio: "inherit" });
+  console.log(`\n⏰ Scheduled "${s.name}" → ${s.mode}${s.projectId ? ` [${s.projectId}]` : ""}`);
+  const projectEnv = s.projectId ? `PROJECT=${JSON.stringify(s.projectId)} ` : "";
+  execSync(`${projectEnv}npm run ${mode}`, { stdio: "inherit" });
   s.lastRun = Date.now();
 }
 

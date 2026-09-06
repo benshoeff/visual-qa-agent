@@ -27,7 +27,7 @@ crawlRouter.post("/", async (req: Request, res: Response) => {
     const config = body.config || {};
     const autoCaptureBaseline = body.autoCaptureBaseline ?? true;
 
-    const jobId = await startCrawlJob(body.url, config, autoCaptureBaseline);
+    const jobId = await startCrawlJob(body.url, config, autoCaptureBaseline, body.projectId);
     res.status(202).json({ jobId, status: "pending" });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });

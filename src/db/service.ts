@@ -11,9 +11,25 @@ export class DatabaseService {
   async disconnect(): Promise<void> {
     await prisma.$disconnect();
   }
-  async upsertPage(pageConf: PageConfig): Promise<{ id: string }> {
+
+  private async ensureProject(projectId: string, projectName?: string, baseUrl?: string): Promise<void> {
+    await prisma.project.upsert({
+      where: { id: projectId },
+      update: projectName || baseUrl
+        ? { name: projectName ?? undefined, baseUrl: baseUrl ?? undefined }
+        : {},
+      create: {
+        id: projectId,
+        name: projectName ?? projectId,
+        baseUrl: baseUrl ?? "",
+      },
+    });
+  }
+
+  async upsertPage(projectId: string, pageConf: PageConfig): Promise<{ id: string }> {
+    await this.ensureProject(projectId);
     const page = await prisma.page.upsert({
-      where: { name: pageConf.name },
+      where: { projectId_name: { projectId, name: pageConf.name } },
       update: {
         url: pageConf.url,
         waitForSelector: pageConf.waitForSelector,
@@ -21,6 +37,7 @@ export class DatabaseService {
         threshold: pageConf.threshold,
       },
       create: {
+        projectId,
         name: pageConf.name,
         url: pageConf.url,
         waitForSelector: pageConf.waitForSelector,
@@ -31,29 +48,31 @@ export class DatabaseService {
     return { id: page.id };
   }
 
-  async getPages(): Promise<Array<{ id: string; name: string; url: string; threshold?: number }>> {
+  async getPages(projectId?: string): Promise<Array<{ id: string; projectId: string; name: string; url: string; threshold?: number }>> {
     const pages = await prisma.page.findMany({
-      select: { id: true, name: true, url: true, threshold: true },
+      where: projectId ? { projectId } : undefined,
+      select: { id: true, projectId: true, name: true, url: true, threshold: true },
       orderBy: { name: "asc" },
     });
     return pages.map((p) => ({
       id: p.id,
+      projectId: p.projectId,
       name: p.name,
       url: p.url,
       threshold: p.threshold ?? undefined,
     }));
   }
 
-  async getPageByName(name: string) {
-    return prisma.page.findUnique({ where: { name } });
+  async getPageByName(projectId: string, name: string) {
+    return prisma.page.findUnique({ where: { projectId_name: { projectId, name } } });
   }
 
-  async deletePage(name: string): Promise<void> {
-    await prisma.page.delete({ where: { name } });
+  async deletePage(projectId: string, name: string): Promise<void> {
+    await prisma.page.deleteMany({ where: { projectId, name } });
   }
 
-  async saveBaseline(pageName: string, imagePath: string, imageHash: string, viewport: { width: number; height: number }): Promise<string> {
-    const page = await prisma.page.findUnique({ where: { name: pageName } });
+  async saveBaseline(projectId: string, pageName: string, imagePath: string, imageHash: string, viewport: { width: number; height: number }): Promise<string> {
+    const page = await prisma.page.findUnique({ where: { projectId_name: { projectId, name: pageName } } });
     if (!page) throw new Error(`Page ${pageName} not found`);
 
     const baseline = await prisma.baseline.upsert({
@@ -64,8 +83,8 @@ export class DatabaseService {
     return baseline.id;
   }
 
-  async getLatestBaseline(pageName: string) {
-    const page = await prisma.page.findUnique({ where: { name: pageName } });
+  async getLatestBaseline(projectId: string, pageName: string) {
+    const page = await prisma.page.findUnique({ where: { projectId_name: { projectId, name: pageName } } });
     if (!page) return null;
 
     return prisma.baseline.findFirst({
@@ -75,15 +94,17 @@ export class DatabaseService {
   }
 
   async saveTestRun(
+    projectId: string,
     pageName: string,
     result: EnhancedCompareResult,
     config: Config,
     aiMetadata?: { model: string; latencyMs: number; fallbackUsed: boolean }
   ): Promise<string> {
-    const page = await prisma.page.findUnique({ where: { name: pageName } });
+    await this.ensureProject(projectId);
+    const page = await prisma.page.findUnique({ where: { projectId_name: { projectId, name: pageName } } });
     if (!page) throw new Error(`Page ${pageName} not found`);
 
-    const baseline = await this.getLatestBaseline(pageName);
+    const baseline = await this.getLatestBaseline(projectId, pageName);
 
     const testRun = await prisma.testRun.create({
       data: {
@@ -170,8 +191,8 @@ export class DatabaseService {
     }
   }
 
-  async getTestHistory(pageName?: string, limit = 50) {
-    const where = pageName ? { page: { name: pageName } } : {};
+  async getTestHistory(projectId: string, pageName?: string, limit = 50) {
+    const where = pageName ? { page: { projectId, name: pageName } } : { page: { projectId } };
     return prisma.testRun.findMany({
       where,
       include: { page: true, aiAnalysisRel: true },
@@ -187,8 +208,8 @@ export class DatabaseService {
     });
   }
 
-  async getTrends(pageName: string, days = 30) {
-    const page = await prisma.page.findUnique({ where: { name: pageName } });
+  async getTrends(projectId: string, pageName: string, days = 30) {
+    const page = await prisma.page.findUnique({ where: { projectId_name: { projectId, name: pageName } } });
     if (!page) return [];
 
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);

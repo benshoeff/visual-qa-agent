@@ -87,16 +87,27 @@ export interface PerformanceConfig {
   };
 }
 
-export interface Config {
+export interface ProjectConfig {
+  id: string;
+  name: string;
+  baseUrl: string;
   viewport: { width: number; height: number };
   threshold: number;
   waitFor: "networkidle" | "domcontentloaded" | "load";
   pages: PageConfig[];
   globalIgnoreZones?: IgnoreZone[];
+  fullPage?: Partial<FullPageConfig>;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export interface Config {
+  version?: number;
+  activeProjectId: string;
+  projects: ProjectConfig[];
   ai?: AIConfig;
   browsers?: BrowserProject[];
   performance?: PerformanceConfig;
-  fullPage?: Partial<FullPageConfig>;
 }
 
 const ROOT = process.cwd();
@@ -105,6 +116,11 @@ export const BASELINES_DIR = path.join(ROOT, "baselines");
 export const CURRENT_DIR = path.join(ROOT, "current");
 export const DIFFS_DIR = path.join(ROOT, "diffs");
 export const REPORTS_DIR = path.join(ROOT, "reports");
+
+const CONFIG_PATH = path.join(ROOT, "config.json");
+
+export const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
+export const DEFAULT_THRESHOLD = 0.2;
 
 export const DEFAULT_AI_CONFIG: AIConfig = {
   enabled: false,
@@ -189,42 +205,142 @@ export const DEFAULT_CRAWL_CONFIG: CrawlConfig = {
   viewport: { width: 1280, height: 720 },
 };
 
-export function screenshotPath(dir: string, name: string, browserProject?: string) {
-  const suffix = browserProject ? `-${browserProject}` : "";
-  return path.join(dir, `${name}${suffix}.png`);
+export function normalizeProject(project: ProjectConfig): ProjectConfig {
+  return {
+    ...project,
+    viewport: project.viewport ?? DEFAULT_VIEWPORT,
+    threshold: project.threshold ?? DEFAULT_THRESHOLD,
+    waitFor: project.waitFor ?? "networkidle",
+    pages: project.pages ?? [],
+    globalIgnoreZones: project.globalIgnoreZones ?? [],
+    fullPage: { ...DEFAULT_FULLPAGE_CONFIG, ...project.fullPage },
+  };
 }
 
-export function a11yBaselinePath(name: string) {
-  return path.join(BASELINES_DIR, `${name}.a11y.json`);
-}
-
-export function captureModeFor(pageConf: PageConfig, config: Config): CaptureMode {
-  return pageConf.captureMode ?? config.fullPage?.defaultMode ?? DEFAULT_FULLPAGE_CONFIG.defaultMode;
-}
-
-export function fullPageMaxHeight(config: Config): number {
-  const maxHeight = config.fullPage?.maxHeight;
-  return typeof maxHeight === "number" && maxHeight > 0 ? maxHeight : DEFAULT_FULLPAGE_CONFIG.maxHeight;
+function safeOrigin(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "";
+  }
 }
 
 export function readConfig(): Config {
-  const config = JSON.parse(
-    fs.readFileSync(path.join(ROOT, "config.json"), "utf-8")
-  );
+  const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+
+  if (Array.isArray(raw.projects)) {
+    const projects = (raw.projects as ProjectConfig[]).map(normalizeProject);
+    const activeProjectId =
+      projects.some((p) => p.id === raw.activeProjectId)
+        ? raw.activeProjectId
+        : projects[0]?.id ?? "";
+    return {
+      version: 2,
+      activeProjectId,
+      projects,
+      ai: { ...DEFAULT_AI_CONFIG, ...raw.ai },
+      performance: { ...DEFAULT_PERFORMANCE_CONFIG, ...raw.performance },
+      browsers: raw.browsers ?? DEFAULT_BROWSER_PROJECTS,
+    };
+  }
+
+  // ── v1 (legacy flat config) → migrate to a single default project ──────
+  const legacy = raw as Record<string, any> & {
+    pages?: PageConfig[];
+    viewport?: { width: number; height: number };
+    threshold?: number;
+  };
+  const baseUrl = legacy.pages?.[0]?.url ? safeOrigin(legacy.pages[0].url) : "";
+
+  const project: ProjectConfig = normalizeProject({
+    id: "default",
+    name: legacy.name ?? (baseUrl ? new URL(baseUrl).hostname : "Default Project"),
+    baseUrl,
+    viewport: legacy.viewport ?? DEFAULT_VIEWPORT,
+    threshold: legacy.threshold ?? DEFAULT_THRESHOLD,
+    waitFor: legacy.waitFor ?? "networkidle",
+    pages: legacy.pages ?? [],
+    globalIgnoreZones: legacy.globalIgnoreZones ?? [],
+    fullPage: { ...DEFAULT_FULLPAGE_CONFIG, ...legacy.fullPage },
+  });
+
   return {
-    ...config,
-    globalIgnoreZones: config.globalIgnoreZones ?? [],
-    ai: { ...DEFAULT_AI_CONFIG, ...config.ai },
-    performance: { ...DEFAULT_PERFORMANCE_CONFIG, ...config.performance },
-    browsers: config.browsers ?? DEFAULT_BROWSER_PROJECTS,
-    fullPage: { ...DEFAULT_FULLPAGE_CONFIG, ...config.fullPage },
+    version: 2,
+    activeProjectId: project.id,
+    projects: [project],
+    ai: { ...DEFAULT_AI_CONFIG, ...legacy.ai },
+    performance: { ...DEFAULT_PERFORMANCE_CONFIG, ...legacy.performance },
+    browsers: legacy.browsers ?? DEFAULT_BROWSER_PROJECTS,
   };
 }
 
 export function writeConfig(config: Config): void {
-  fs.writeFileSync(
-    path.join(ROOT, "config.json"),
-    JSON.stringify(config, null, 2),
-    "utf-8"
-  );
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
+}
+
+// ─── Project helpers ────────────────────────────────────────────────────────
+
+export function resolveProjectId(config: Config, requestedId?: string): string {
+  const id = (requestedId ?? process.env.PROJECT)?.trim();
+  if (id && config.projects.some((p) => p.id === id)) return id;
+  if (config.projects.some((p) => p.id === config.activeProjectId)) return config.activeProjectId;
+  return config.projects[0]?.id ?? "";
+}
+
+export function getProject(config: Config, projectId?: string): ProjectConfig | undefined {
+  const id = resolveProjectId(config, projectId);
+  return config.projects.find((p) => p.id === id);
+}
+
+export function getActiveProject(config: Config): ProjectConfig | undefined {
+  return getProject(config);
+}
+
+export function slugify(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0590-\u05ff]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-+/g, "-");
+}
+
+export function ensureUniqueProjectId(config: Config, desired: string): string {
+  let id = slugify(desired) || "project";
+  if (config.projects.some((p) => p.id === id)) {
+    id = `${id}-${Date.now().toString(36).slice(-4)}`;
+  }
+  return id;
+}
+
+// ─── Per-project paths ──────────────────────────────────────────────────────
+
+export function projectArtifactsDir(root: string, projectId: string): string {
+  return path.join(root, projectId);
+}
+
+export function screenshotPath(dir: string, projectId: string, name: string, browserProject?: string): string {
+  const suffix = browserProject ? `-${browserProject}` : "";
+  return path.join(dir, projectId, `${name}${suffix}.png`);
+}
+
+export function a11yBaselinePath(projectId: string, name: string): string {
+  return path.join(BASELINES_DIR, projectId, `${name}.a11y.json`);
+}
+
+export function perfBaselinePath(projectId: string, name: string): string {
+  return path.join(BASELINES_DIR, projectId, `${name}.perf.json`);
+}
+
+export function reportPath(projectId: string, timestamp?: number): string {
+  return path.join(REPORTS_DIR, projectId, `report-${timestamp ?? Date.now()}.html`);
+}
+
+export function captureModeFor(pageConf: PageConfig, project: ProjectConfig): CaptureMode {
+  return pageConf.captureMode ?? project.fullPage?.defaultMode ?? DEFAULT_FULLPAGE_CONFIG.defaultMode;
+}
+
+export function fullPageMaxHeight(project: ProjectConfig): number {
+  const maxHeight = project.fullPage?.maxHeight;
+  return typeof maxHeight === "number" && maxHeight > 0 ? maxHeight : DEFAULT_FULLPAGE_CONFIG.maxHeight;
 }

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { FileText, Monitor, Target, ClipboardList, Play, Settings2, FileBarChart2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { getConfig, getReports, updateConfig } from '../api'
-import type { Config } from '../api'
+import { getReports, updateConfig } from '../api'
+import { useProject } from '@/contexts/ProjectContext'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -48,16 +48,18 @@ function StatCard({ icon: Icon, value, label, className, ...editable }: StatCard
 }
 
 export default function Dashboard() {
-  const [config, setConfig] = useState<Config | null>(null)
+  const { project } = useProject()
   const [reportCount, setReportCount] = useState(0)
   const [editingThreshold, setEditingThreshold] = useState(false)
   const [thresholdInput, setThresholdInput] = useState('')
   const sliderRef = useRef<HTMLInputElement>(null)
 
+  const config = project
+  const projectId = project?.id
+
   useEffect(() => {
-    getConfig().then(setConfig)
-    getReports().then((r) => setReportCount(r.length))
-  }, [])
+    getReports(projectId).then((r) => setReportCount(r.length))
+  }, [projectId])
 
   useEffect(() => {
     if (editingThreshold && sliderRef.current) {
@@ -75,8 +77,7 @@ export default function Dashboard() {
     const val = parseFloat(thresholdInput)
     if (!isNaN(val) && val >= 0 && val <= 100) {
       try {
-        const updated = await updateConfig({ threshold: val })
-        setConfig(updated)
+        await updateConfig({ threshold: val }, projectId)
       } catch {
         // revert on failure
       }
@@ -91,7 +92,7 @@ export default function Dashboard() {
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground">
-          Visual regression monitoring overview.
+          {config ? `Visual regression monitoring for "${config.name}".` : 'Visual regression monitoring overview.'}
         </p>
       </header>
 

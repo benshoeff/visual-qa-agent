@@ -3,6 +3,7 @@ import { EyeOff, Globe, FileText, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getPages, getIgnoreZones, getIgnoreZonesAll, getImageUrl } from '../api'
 import type { IgnoreZone, PageConfig } from '../api'
+import { useProject } from '@/contexts/ProjectContext'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -25,6 +26,8 @@ import IgnoreZoneEditor from './IgnoreZoneEditor'
 const urlPage = new URLSearchParams(window.location.search).get('page')
 
 export default function IgnoreZonesPage() {
+  const { project } = useProject()
+  const projectId = project?.id
   const [pages, setPages] = useState<PageConfig[]>([])
   const [selectedPage, setSelectedPage] = useState<string>(urlPage ?? '__global__')
   const [zones, setZones] = useState<IgnoreZone[]>([])
@@ -35,22 +38,22 @@ export default function IgnoreZonesPage() {
 
   const loadPages = useCallback(async () => {
     try {
-      const p = await getPages()
+      const p = await getPages(projectId)
       setPages(p)
     } catch {
       // ignore
     }
-  }, [])
+  }, [projectId])
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
       if (selectedPage === '__global__') {
-        const data = await getIgnoreZonesAll()
+        const data = await getIgnoreZonesAll(projectId)
         setZones(data.global)
         setAllData(data.pages)
       } else {
-        const z = await getIgnoreZones(selectedPage)
+        const z = await getIgnoreZones(selectedPage, projectId)
         setZones(z)
       }
     } catch (err) {
@@ -59,7 +62,7 @@ export default function IgnoreZonesPage() {
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPage, refreshKey])
+  }, [selectedPage, refreshKey, projectId])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -82,7 +85,7 @@ export default function IgnoreZonesPage() {
   }, [loadData])
 
   const baselineUrl = selectedPage !== '__global__'
-    ? `${getImageUrl('baseline', selectedPage)}&t=${refreshKey}`
+    ? `${getImageUrl('baseline', selectedPage, projectId)}&t=${refreshKey}`
     : ''
 
   return (
@@ -247,6 +250,7 @@ export default function IgnoreZonesPage() {
               pageName={selectedPage === '__global__' ? null : selectedPage}
               baselineUrl={baselineUrl}
               initialZones={zones}
+              projectId={projectId}
               onSaved={() => {
                 setRefreshKey((k) => k + 1)
                 setEditorOpen(false)

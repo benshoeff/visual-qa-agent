@@ -9,6 +9,8 @@
     "test": "tsx src/agent.ts --mode=test",
     "crawl": "tsx scripts/crawl.ts",
     "run:scheduled": "node scripts/run-scheduled.mjs",
+    "migrate:projects": "tsx scripts/migrate-projects.ts",
+    "typecheck": "tsc --noEmit",
     "server": "tsx src/server.ts",
     "dev:server": "tsx watch src/server.ts",
     "dev:client": "npm run dev --prefix client",

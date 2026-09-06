@@ -1,0 +1,12 @@
+{
+  "violations": [],
+  "passes": 28,
+  "incomplete": 1,
+  "inapplicable": 61,
+  "timestamp": "2026-09-06T09:44:29.223Z",
+  "url": "https://benshoeff.vercel.app/",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  }
+}

@@ -23,6 +23,7 @@ import {
   fetchReportHtml,
 } from '../api'
 import type { PageConfig, RunStatus } from '../api'
+import { useProject } from '@/contexts/ProjectContext'
 import { parseReport } from '@/lib/reportParser'
 import type { PageResult } from '@/lib/reportParser'
 import { Button } from '@/components/ui/button'
@@ -32,6 +33,8 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 export default function TestRunner() {
+  const { project } = useProject()
+  const projectId = project?.id
   const [loading, setLoading] = useState<'baseline' | 'test' | null>(null)
   const [error, setError] = useState('')
   const [pages, setPages] = useState<PageConfig[]>([])
@@ -43,13 +46,14 @@ export default function TestRunner() {
 
   const loadSummary = async () => {
     try {
-      const reports = await getReports()
+      if (!projectId) return
+      const reports = await getReports(projectId)
       const latest = reports[0]
       if (!latest) {
         setRunSummary([])
         return
       }
-      const html = await fetchReportHtml(latest.filename)
+      const html = await fetchReportHtml(latest.filename, projectId)
       const { pages } = parseReport(html)
       setRunSummary(pages)
     } catch {
@@ -58,10 +62,11 @@ export default function TestRunner() {
   }
 
   useEffect(() => {
-    getPages().then(setPages).catch(() => {})
+    if (!projectId) return
+    getPages(projectId).then(setPages).catch(() => {})
     getRunStatus().then((runs) => setRunStatus(runs[0] ?? null)).catch(() => {})
     Promise.resolve().then(loadSummary)
-  }, [])
+  }, [projectId])
 
   useEffect(() => {
     return () => {
@@ -86,7 +91,7 @@ export default function TestRunner() {
         if (latest && !isRunPending(latest)) {
           stopPolling()
           setLoading(null)
-          getPages().then(setPages).catch(() => {})
+          if (projectId) getPages(projectId).then(setPages).catch(() => {})
           loadSummary()
         }
       } catch {
@@ -119,7 +124,7 @@ export default function TestRunner() {
     setLoading(mode)
     setRunStatus(null)
     try {
-      await dispatchRun(mode, { pages: names, fullPageMode })
+      await dispatchRun(mode, { pages: names, fullPageMode, projectId })
       startPolling()
     } catch (e) {
       setError((e as Error).message)
@@ -152,7 +157,7 @@ export default function TestRunner() {
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Test Runner</h1>
         <p className="text-sm text-muted-foreground">
-          Runs are executed in GitHub Actions and will appear below once started.
+          Runs are executed locally (or in GitHub Actions when deployed) and will appear below once started.
         </p>
       </header>
 

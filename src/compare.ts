@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
-import { IgnoreZone, DIFFS_DIR } from "./config.js";
+import { IgnoreZone } from "./config.js";
 
 export interface CompareResult {
   pageName: string;
@@ -109,8 +109,9 @@ export function computeDiffRegions(
   return bands;
 }
 
-export function writeDiffRegions(pageName: string, regions: DiffRegion[]): void {
-  const outPath = path.join(DIFFS_DIR, `${pageName}.regions.json`);
+export function writeDiffRegions(diffPath: string, pageName: string, regions: DiffRegion[]): void {
+  const base = diffPath.replace(/\.png$/i, "");
+  const outPath = `${base}.regions.json`;
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(
     outPath,
@@ -203,7 +204,7 @@ export async function compareScreenshots(
   if (diffPixels > 0) {
     fs.mkdirSync(path.dirname(diffPath), { recursive: true });
     fs.writeFileSync(diffPath, PNG.sync.write(diffImg));
-    writeDiffRegions(pageName, computeDiffRegions(baselineNorm, currentNorm));
+    writeDiffRegions(diffPath, pageName, computeDiffRegions(baselineNorm, currentNorm));
   }
 
   return {

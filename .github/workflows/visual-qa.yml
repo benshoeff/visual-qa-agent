@@ -14,6 +14,11 @@ on:
           - test
           - baseline
           - crawl
+      project:
+        description: Project ID (empty for active project)
+        required: false
+        default: ''
+        type: string
       pages:
         description: Pages (comma-separated) or empty for all
         required: false
@@ -88,6 +93,7 @@ jobs:
           CRAWL_CONFIG: ${{ github.event.inputs.crawl_config }}
           CRAWL_JOB_ID: ${{ github.event.inputs.job_id }}
           AUTO_CAPTURE_BASELINE: ${{ github.event.inputs.auto_capture_baseline }}
+          PROJECT: ${{ github.event.inputs.project }}
         run: npm run crawl
 
       - name: Run test/baseline (manual)
@@ -95,12 +101,13 @@ jobs:
         env:
           PAGES: ${{ github.event.inputs.pages }}
           FULLPAGE_MODE: ${{ github.event.inputs.fullpage_mode }}
+          PROJECT: ${{ github.event.inputs.project }}
         run: npm run ${{ github.event.inputs.mode }}
 
       # When re-capturing baselines, old current/diffs are stale — remove them.
       - name: Remove stale current/diffs (baseline update)
         if: always() && github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'baseline'
-        run: rm -f current/*.png diffs/*.png || true
+        run: rm -rf current/* diffs/* || true
 
       - name: Commit results back to git
         if: always()

@@ -12,6 +12,7 @@ import {
 import { toast } from 'sonner'
 import { getReports, getReportUrl, getImageUrl, fetchReportHtml, getDiffRegions, type DiffRegion } from '../api'
 import type { ReportFile } from '../api'
+import { useProject } from '@/contexts/ProjectContext'
 import FullPageDiff from './FullPageDiff'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -88,6 +89,8 @@ function parseReport(html: string): { summary: Summary | null; pages: PageResult
 }
 
 export default function ReportViewer() {
+  const { project } = useProject()
+  const projectId = project?.id
   const [reports, setReports] = useState<ReportFile[]>([])
   const [selectedReport, setSelectedReport] = useState<string | null>(null)
   const [report, setReport] = useState<{ summary: Summary | null; pages: PageResult[] } | null>(null)
@@ -99,19 +102,19 @@ export default function ReportViewer() {
   const paginated = reports.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
 
   useEffect(() => {
-    getReports()
+    getReports(projectId)
       .then((data) => {
         setReports(data)
         setPage(0)
       })
       .catch(() => toast.error('Failed to load reports'))
-  }, [])
+  }, [projectId])
 
   const viewReport = async (filename: string) => {
     setSelectedReport(filename)
     setReport(null)
     try {
-      const html = await fetchReportHtml(filename)
+      const html = await fetchReportHtml(filename, projectId)
       setReport(parseReport(html))
     } catch {
       toast.error('Failed to load report')
@@ -201,7 +204,7 @@ export default function ReportViewer() {
               <header className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold tracking-tight">{selectedReport}</h2>
                 <Button variant="outline" size="sm" asChild>
-                  <a href={getReportUrl(selectedReport)} target="_blank" rel="noreferrer">
+                  <a href={getReportUrl(selectedReport, projectId)} target="_blank" rel="noreferrer">
                     <ExternalLink /> Open Full Report
                   </a>
                 </Button>
@@ -283,7 +286,7 @@ export default function ReportViewer() {
                                     onClick={() => {
                                       setDiffView({ page: p.pageName })
                                       setDiffRegions([])
-                                      getDiffRegions(p.pageName).then((data) =>
+                                      getDiffRegions(p.pageName, projectId).then((data) =>
                                         setDiffRegions(data?.regions ?? [])
                                       )
                                     }}
@@ -321,9 +324,9 @@ export default function ReportViewer() {
           </DialogHeader>
           {diffView && (
             <FullPageDiff
-              baselineUrl={getImageUrl('baseline', diffView.page)}
-              currentUrl={getImageUrl('current', diffView.page)}
-              diffUrl={getImageUrl('diff', diffView.page)}
+              baselineUrl={getImageUrl('baseline', diffView.page, projectId)}
+              currentUrl={getImageUrl('current', diffView.page, projectId)}
+              diffUrl={getImageUrl('diff', diffView.page, projectId)}
               regions={diffRegions}
             />
           )}

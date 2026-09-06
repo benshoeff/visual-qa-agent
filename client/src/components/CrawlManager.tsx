@@ -11,6 +11,7 @@ import {
 import { toast } from 'sonner'
 import { startCrawl, getCrawlJob, confirmBaselines } from '../api'
 import type { CrawlJob, DiscoveredPage } from '../api'
+import { useProject } from '@/contexts/ProjectContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -82,6 +83,8 @@ function PageCard({
 }
 
 export default function CrawlManager() {
+  const { project } = useProject()
+  const projectId = project?.id
   const [url, setUrl] = useState('')
   const [config, setConfig] = useState<CrawlConfigInput>({
     maxPages: 50,
@@ -139,7 +142,7 @@ export default function CrawlManager() {
         maxDepth: config.maxDepth,
         sameDomainOnly: config.sameDomainOnly,
         waitFor: config.waitFor,
-      })
+      }, projectId)
       setUrl('')
       setActiveJob({
         id: jobId,

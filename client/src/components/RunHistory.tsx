@@ -14,6 +14,7 @@ import {
 import { toast } from 'sonner'
 import { getReports, fetchReportHtml, getImageUrl, getDiffRegions, type DiffRegion } from '../api'
 import type { ReportFile } from '../api'
+import { useProject } from '@/contexts/ProjectContext'
 import { parseReport } from '@/lib/reportParser'
 import type { PageResult, ReportSummary } from '@/lib/reportParser'
 import FullPageDiff from './FullPageDiff'
@@ -73,6 +74,8 @@ function statusBadge(p: PageResult) {
 }
 
 export default function RunHistory() {
+  const { project } = useProject()
+  const projectId = project?.id
   const [runs, setRuns] = useState<Run[]>([])
   const [visible, setVisible] = useState(BATCH)
   const [loading, setLoading] = useState(true)
@@ -83,13 +86,13 @@ export default function RunHistory() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.resolve(getReports())
+    Promise.resolve(getReports(projectId))
       .then(async (files) => {
         if (cancelled) return
         const parsed: Run[] = []
         for (const file of files) {
           try {
-            const html = await fetchReportHtml(file.filename)
+            const html = await fetchReportHtml(file.filename, projectId)
             const { summary, pages } = parseReport(html)
             parsed.push({ file, summary, pages })
           } catch {
@@ -108,7 +111,7 @@ export default function RunHistory() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [projectId])
 
   const filteredRuns = useMemo(() => {
     let list = runs
@@ -254,7 +257,7 @@ export default function RunHistory() {
                       onCompare={(page) => {
                         setDiffView({ page })
                         setDiffRegions([])
-                        getDiffRegions(page).then((data) => setDiffRegions(data?.regions ?? []))
+                        getDiffRegions(page, projectId).then((data) => setDiffRegions(data?.regions ?? []))
                       }}
                     />
                   )
@@ -280,9 +283,9 @@ export default function RunHistory() {
           </DialogHeader>
           {diffView && (
             <FullPageDiff
-              baselineUrl={getImageUrl('baseline', diffView.page)}
-              currentUrl={getImageUrl('current', diffView.page)}
-              diffUrl={getImageUrl('diff', diffView.page)}
+              baselineUrl={getImageUrl('baseline', diffView.page, projectId)}
+              currentUrl={getImageUrl('current', diffView.page, projectId)}
+              diffUrl={getImageUrl('diff', diffView.page, projectId)}
               regions={diffRegions}
             />
           )}

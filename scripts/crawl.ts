@@ -2,7 +2,7 @@ import { chromium, Page } from "playwright";
 import fs from "fs";
 import path from "path";
 import { runBaselineForPage } from "../src/agent.js";
-import { readConfig, PageConfig } from "../src/config.js";
+import { readConfig, PageConfig, getProject } from "../src/config.js";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -33,6 +33,11 @@ try {
 }
 
 const appConfig = readConfig();
+const project = getProject(appConfig);
+if (!project) {
+  console.error("❌ אין פרויקט מוגדר בקונפיג");
+  process.exit(1);
+}
 const excludePatterns =
   crawlConfig.excludePatterns ??
   [
@@ -99,6 +104,7 @@ function writeResult(partial: Partial<{ status: string; discoveredPages: Discove
     id: jobId,
     status: "pending",
     startUrl,
+    projectId: project.id,
     discoveredPages: [],
     createdAt: new Date().toISOString(),
   };
@@ -148,16 +154,16 @@ async function run() {
   if (autoCapture && discovered.length > 0) {
     let captured = 0;
     for (const dp of discovered) {
-      if (appConfig.pages.some((p) => p.name === dp.name)) continue;
+      if (project.pages.some((p) => p.name === dp.name)) continue;
       const pageConfig: PageConfig = {
         name: dp.name,
         url: dp.url,
         waitForSelector: undefined,
         mask: [],
-        threshold: appConfig.threshold,
+        threshold: project.threshold,
       };
       try {
-        await runBaselineForPage(appConfig, pageConfig);
+        await runBaselineForPage(appConfig, project, pageConfig);
         captured++;
       } catch (err) {
         console.warn(`Baseline failed for ${dp.name}:`, (err as Error).message);

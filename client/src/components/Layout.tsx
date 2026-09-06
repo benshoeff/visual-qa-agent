@@ -14,6 +14,8 @@ import {
   Sparkles,
   History,
   EyeOff,
+  FolderKanban,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -27,6 +29,14 @@ import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTheme } from '@/hooks/use-theme'
 import type { Theme } from '@/hooks/use-theme'
+import { useProject } from '@/contexts/ProjectContext'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 const links = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -37,6 +47,7 @@ const links = [
   { to: '/schedules', label: 'Schedules', icon: Clock },
   { to: '/reports', label: 'Reports', icon: FileBarChart2 },
   { to: '/ignore-zones', label: 'Ignore Zones', icon: EyeOff },
+  { to: '/projects', label: 'Projects', icon: FolderKanban },
 ]
 
 function ThemeToggle() {
@@ -83,6 +94,41 @@ function Brand() {
   )
 }
 
+function ProjectSwitcher() {
+  const { config, project, loading, switchProject } = useProject()
+
+  if (loading || !config || config.projects.length === 0) {
+    return (
+      <div className="px-4 pb-2">
+        <div className="flex h-9 items-center gap-2 rounded-lg border bg-muted/50 px-2 text-xs text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" />
+          {loading ? 'Loading projects…' : 'No projects'}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="px-4 pb-2">
+      <Select value={project?.id ?? ''} onValueChange={(v) => void switchProject(v)}>
+        <SelectTrigger className="h-9 w-full text-xs" aria-label="Active project">
+          <SelectValue placeholder="Select project" />
+        </SelectTrigger>
+        <SelectContent>
+          {config.projects.map((p) => (
+            <SelectItem key={p.id} value={p.id}>
+              <span className="flex flex-col leading-tight">
+                <span className="text-xs font-medium">{p.name}</span>
+                <span className="text-[10px] text-muted-foreground">{p.baseUrl}</span>
+              </span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
 function Nav({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex flex-1 flex-col gap-1 px-3" aria-label="Main navigation">
@@ -124,6 +170,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground md:flex">
         <Brand />
+        <ProjectSwitcher />
         <Nav />
         <div className="flex items-center justify-between border-t px-4 py-3">
           <span className="text-xs text-muted-foreground">v1.0</span>
@@ -145,6 +192,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </SheetHeader>
               <div className="flex flex-col gap-1">
                 <Brand />
+                <ProjectSwitcher />
                 <Nav onNavigate={() => setMobileOpen(false)} />
               </div>
               <div className="mt-auto flex items-center justify-between border-t px-4 py-3">

@@ -1,8 +1,9 @@
 import { chromium, Browser, Page } from "playwright";
 import { jobStore } from "./utils/jobStore.js";
 import { CrawlJob, CrawlConfig, DiscoveredPage, CrawlResult, CrawlJobStatus } from "./types/crawl.js";
-import { readConfig, DEFAULT_CRAWL_CONFIG, PageConfig, BASELINES_DIR } from "./config.js";
+import { readConfig, DEFAULT_CRAWL_CONFIG, PageConfig, BASELINES_DIR, resolveProjectId, getProject, ProjectConfig, screenshotPath } from "./config.js";
 import { runBaselineForPage } from "./agent.js";
+import { assertNavigablePage } from "./browser.js";
 import fs from "fs";
 import path from "path";
 
@@ -29,6 +30,20 @@ function sameDomain(url1: string, url2: string): boolean {
 function isExcluded(url: string, patterns: string[]): boolean {
   const pathname = new URL(url).pathname;
   return patterns.some((p) => pathname.startsWith(p));
+}
+
+const NON_HTML_EXT_RE = /\.(?:pdf|png|jpe?g|gif|webp|svg|ico|bmp|avif|zip|tar|gz|rar|7z|exe|dmg|apk|ipa|mp3|mp4|mov|avi|wav|ogg|woff2?|ttf|otf|eot)$/i;
+
+function isHtmlAsset(url: string): boolean {
+  try {
+    const pathname = new URL(url).pathname;
+    const lastSegment = pathname.split("/").pop() ?? "";
+    if (!lastSegment.includes(".")) return true;
+    if (lastSegment.endsWith(".html") || lastSegment.endsWith(".htm") || lastSegment.endsWith(".php") || lastSegment.endsWith(".aspx")) return true;
+    return !NON_HTML_EXT_RE.test(lastSegment) ? true : false;
+  } catch {
+    return true;
+  }
 }
 
 function urlToPageName(url: string, baseUrl: string): string {
@@ -68,6 +83,7 @@ async function discoverLinks(page: Page, currentUrl: string, baseUrl: string, co
   for (const link of links) {
     if (config.sameDomainOnly && !sameDomain(link.url, baseUrl)) continue;
     if (isExcluded(link.url, config.excludePatterns)) continue;
+    if (!isHtmlAsset(link.url)) continue;
     if (!unique.has(link.url)) {
       unique.set(link.url, {
         url: link.url,
@@ -80,7 +96,7 @@ async function discoverLinks(page: Page, currentUrl: string, baseUrl: string, co
   return Array.from(unique.values());
 }
 
-export async function startCrawlJob(startUrl: string, configOverrides: Partial<CrawlConfig> = {}, autoCaptureBaseline = true): Promise<string> {
+export async function startCrawlJob(startUrl: string, configOverrides: Partial<CrawlConfig> = {}, autoCaptureBaseline = true, projectId?: string): Promise<string> {
   const jobId = generateId();
   const config: CrawlConfig = { ...DEFAULT_CRAWL_CONFIG, ...configOverrides };
   const baseUrl = new URL(startUrl).origin;
@@ -93,18 +109,19 @@ const job: CrawlJob = {
     progress: { current: 0, total: 1, currentUrl: startUrl },
     discoveredPages: [],
     results: [],
+    projectId: projectId ?? "",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
   jobStore.create(job);
 
-  runCrawlInBackground(jobId, startUrl, config, baseUrl, autoCaptureBaseline);
+  runCrawlInBackground(jobId, startUrl, config, baseUrl, autoCaptureBaseline, projectId);
 
   return jobId;
 }
 
-async function runCrawlInBackground(jobId: string, startUrl: string, config: CrawlConfig, baseUrl: string, autoCaptureBaseline: boolean) {
+async function runCrawlInBackground(jobId: string, startUrl: string, config: CrawlConfig, baseUrl: string, autoCaptureBaseline: boolean, requestedProjectId?: string) {
   const browser = await chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
   const context = await browser.newContext({ viewport: config.viewport });
   const page = await context.newPage();
@@ -133,6 +150,7 @@ async function runCrawlInBackground(jobId: string, startUrl: string, config: Cra
     jobStore.update(jobId, { progress: currentJob.progress });
 
     try {
+      await assertNavigablePage(url);
       await page.goto(url, { waitUntil: config.waitFor, timeout: 30000 });
       await page.waitForTimeout(500);
       visited.add(url);
@@ -164,35 +182,42 @@ async function runCrawlInBackground(jobId: string, startUrl: string, config: Cra
 
   if (autoCaptureBaseline && discovered.length > 0) {
     const appConfig = readConfig();
-    for (let i = 0; i < discovered.length; i++) {
-      const dp = discovered[i];
-      const currentJob = jobStore.get(jobId);
-      if (!currentJob) break;
+    const project = requestedProjectId
+      ? getProject(appConfig, requestedProjectId) ?? getProject(appConfig)
+      : getProject(appConfig);
+    if (project) {
+      for (let i = 0; i < discovered.length; i++) {
+        const dp = discovered[i];
+        const currentJob = jobStore.get(jobId);
+        if (!currentJob) break;
 
-      currentJob.progress = { current: i + 1, total: discovered.length, currentUrl: dp.url };
-      jobStore.update(jobId, { progress: currentJob.progress });
+        currentJob.progress = { current: i + 1, total: discovered.length, currentUrl: dp.url };
+        jobStore.update(jobId, { progress: currentJob.progress });
 
-      const pageName = dp.name;
-      const existingPages = appConfig.pages.filter((p) => p.name === pageName);
-      if (existingPages.length > 0) {
-        results.push({ pageName, url: dp.url, success: true, baselinePath: path.join(BASELINES_DIR, `${pageName}.png`), error: "Already exists in config" });
-        continue;
-      }
+        const pageName = dp.name;
+        const existingPages = appConfig.projects
+          .find((p) => p.id === project.id)
+          ?.pages.filter((p) => p.name === pageName);
+        if (existingPages && existingPages.length > 0) {
+          results.push({ pageName, url: dp.url, success: true, baselinePath: screenshotPath(BASELINES_DIR, project.id, pageName), error: "Already exists in config" });
+          continue;
+        }
 
-      const pageConfig: PageConfig = {
-        name: pageName,
-        url: dp.url,
-        waitForSelector: undefined,
-        mask: [],
-        threshold: appConfig.threshold,
-      };
+        const pageConfig: PageConfig = {
+          name: pageName,
+          url: dp.url,
+          waitForSelector: undefined,
+          mask: [],
+          threshold: project.threshold,
+        };
 
-      try {
-        await runBaselineForPage(appConfig, pageConfig);
-        const baselinePath = path.join(BASELINES_DIR, `${pageName}.png`);
-        results.push({ pageName, url: dp.url, success: true, baselinePath });
-      } catch (err) {
-        results.push({ pageName, url: dp.url, success: false, error: (err as Error).message });
+        try {
+          await runBaselineForPage(appConfig, project, pageConfig);
+          const baselinePath = screenshotPath(BASELINES_DIR, project.id, pageName);
+          results.push({ pageName, url: dp.url, success: true, baselinePath });
+        } catch (err) {
+          results.push({ pageName, url: dp.url, success: false, error: (err as Error).message });
+        }
       }
     }
   }
@@ -211,6 +236,9 @@ export async function confirmBaselines(jobId: string, pageNames: string[]): Prom
   if (job.status !== "completed") throw new Error("Job not completed");
 
   const appConfig = readConfig();
+  const project = getProject(appConfig, job.projectId);
+  if (!project) throw new Error("Project not found for crawl job");
+
   let added = 0;
   let skipped = 0;
 
@@ -218,7 +246,7 @@ export async function confirmBaselines(jobId: string, pageNames: string[]): Prom
     const dp = job.discoveredPages.find((p) => p.name === pageName);
     if (!dp) { skipped++; continue; }
 
-    if (appConfig.pages.some((p) => p.name === pageName)) {
+    if (project.pages.some((p) => p.name === pageName)) {
       skipped++;
       continue;
     }
@@ -228,9 +256,9 @@ export async function confirmBaselines(jobId: string, pageNames: string[]): Prom
       url: dp.url,
       waitForSelector: undefined,
       mask: [],
-      threshold: appConfig.threshold,
+      threshold: project.threshold,
     };
-    appConfig.pages.push(pageConfig);
+    project.pages.push(pageConfig);
     added++;
   }
 

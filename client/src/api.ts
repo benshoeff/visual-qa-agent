@@ -35,11 +35,45 @@ export interface FullPageConfig {
   maxHeight: number
 }
 
-export interface Config {
+export interface IgnoreZone {
+  id: string
+  name: string
+  type: 'bounding-box' | 'selector'
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  selector?: string
+  enabled: boolean
+}
+
+export interface ProjectConfig {
+  id: string
+  name: string
+  baseUrl: string
   viewport: { width: number; height: number }
   threshold: number
+  waitFor: string
   pages: PageConfig[]
+  globalIgnoreZones: IgnoreZone[]
   fullPage?: FullPageConfig
+}
+
+export interface Config {
+  version?: number
+  activeProjectId: string
+  projects: ProjectConfig[]
+  ai?: { provider: string; model: string } & Record<string, unknown>
+  browsers?: string[]
+  performance?: Record<string, unknown>
+}
+
+export function activeProject(config: Config): ProjectConfig | undefined {
+  return config.projects.find((p) => p.id === config.activeProjectId) ?? config.projects[0]
+}
+
+function projectParam(projectId?: string): string {
+  return projectId ? `?project=${encodeURIComponent(projectId)}` : ''
 }
 
 export interface CompareResult {
@@ -64,33 +98,70 @@ export async function getConfig(): Promise<Config> {
   return request<Config>('/api/config')
 }
 
-export async function updateConfig(updates: Partial<Config>): Promise<Config> {
-  return request<Config>('/api/config', {
+export interface ConfigUpdate {
+  viewport?: { width: number; height: number }
+  threshold?: number
+  waitFor?: string
+  ai?: Config['ai']
+  browsers?: string[]
+  performance?: Config['performance']
+  activeProjectId?: string
+}
+
+export async function updateConfig(updates: ConfigUpdate, projectId?: string): Promise<Config> {
+  return request<Config>(`/api/config${projectParam(projectId)}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
   })
 }
 
-export async function getPages(): Promise<PageConfig[]> {
-  return request<PageConfig[]>('/api/pages')
+// Projects
+export async function getProjects(): Promise<{ activeProjectId: string; projects: ProjectConfig[] }> {
+  return request('/api/projects')
 }
 
-export async function addPage(page: PageConfig): Promise<PageConfig> {
-  return request<PageConfig>('/api/pages', {
+export async function addProject(p: { name: string; baseUrl: string; pages?: PageConfig[] }): Promise<ProjectConfig> {
+  return request<ProjectConfig>('/api/projects', {
+    method: 'POST',
+    body: JSON.stringify(p),
+  })
+}
+
+export async function updateProject(id: string, updates: Partial<ProjectConfig>): Promise<ProjectConfig> {
+  return request<ProjectConfig>(`/api/projects?id=${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  })
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  await request(`/api/projects?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function activateProject(id: string): Promise<{ activeProjectId: string }> {
+  return request(`/api/projects?id=${encodeURIComponent(id)}&confirm=true`, { method: 'POST' })
+}
+
+export async function getPages(projectId?: string): Promise<PageConfig[]> {
+  return request<PageConfig[]>(`/api/pages${projectParam(projectId)}`)
+}
+
+export async function addPage(page: PageConfig, projectId?: string): Promise<PageConfig> {
+  return request<PageConfig>(`/api/pages${projectParam(projectId)}`, {
     method: 'POST',
     body: JSON.stringify(page),
   })
 }
 
-export async function updatePage(name: string, page: Partial<PageConfig>): Promise<PageConfig> {
-  return request<PageConfig>(`/api/pages?name=${encodeURIComponent(name)}`, {
+export async function updatePage(name: string, page: Partial<PageConfig>, projectId?: string): Promise<PageConfig> {
+  return request<PageConfig>(`/api/pages?name=${encodeURIComponent(name)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`, {
     method: 'PUT',
     body: JSON.stringify(page),
   })
 }
 
-export async function deletePage(name: string): Promise<void> {
-  await request(`/api/pages?name=${encodeURIComponent(name)}`, { method: 'DELETE' })
+export async function deletePage(name: string, projectId?: string): Promise<void> {
+  await request(`/api/pages?name=${encodeURIComponent(name)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`, { method: 'DELETE' })
 }
 
 export type RunMode = 'test' | 'baseline' | 'crawl'
@@ -102,6 +173,7 @@ export async function dispatchRun(
     url?: string
     crawlConfig?: Record<string, unknown>
     fullPageMode?: 'page-default' | 'viewport' | 'fullPage'
+    projectId?: string
   } = {}
 ): Promise<{ success: boolean; message: string }> {
   return request('/api/dispatch', {
@@ -112,6 +184,7 @@ export async function dispatchRun(
       url: options.url,
       crawlConfig: options.crawlConfig,
       fullPageMode: options.fullPageMode,
+      project: options.projectId,
     }),
   })
 }
@@ -145,16 +218,16 @@ export function runConclusion(r: RunStatus | undefined | null): 'success' | 'neu
   return r?.status === 'completed' && r.conclusion ? (r.conclusion as never) : null
 }
 
-export async function getReports(): Promise<ReportFile[]> {
-  return request<ReportFile[]>('/api/reports')
+export async function getReports(projectId?: string): Promise<ReportFile[]> {
+  return request<ReportFile[]>(`/api/reports${projectParam(projectId)}`)
 }
 
-export function getReportUrl(filename: string): string {
-  return `/api/files?type=report&name=${encodeURIComponent(filename)}`
+export function getReportUrl(filename: string, projectId?: string): string {
+  return `/api/files?type=report&name=${encodeURIComponent(filename)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`
 }
 
-export function getImageUrl(type: 'baseline' | 'current' | 'diff', name: string): string {
-  return `/api/files?type=${type}&name=${encodeURIComponent(name)}`
+export function getImageUrl(type: 'baseline' | 'current' | 'diff', name: string, projectId?: string): string {
+  return `/api/files?type=${type}&name=${encodeURIComponent(name)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`
 }
 
 export interface DiffRegion {
@@ -167,18 +240,18 @@ export interface DiffRegionsFile {
   regions: DiffRegion[]
 }
 
-export async function getDiffRegions(pageName: string): Promise<DiffRegionsFile | null> {
+export async function getDiffRegions(pageName: string, projectId?: string): Promise<DiffRegionsFile | null> {
   try {
     return await request<DiffRegionsFile>(
-      `/api/files?type=regions&name=${encodeURIComponent(pageName)}`
+      `/api/files?type=regions&name=${encodeURIComponent(pageName)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`
     )
   } catch {
     return null
   }
 }
 
-export async function fetchReportHtml(filename: string): Promise<string> {
-  return requestText(getReportUrl(filename))
+export async function fetchReportHtml(filename: string, projectId?: string): Promise<string> {
+  return requestText(getReportUrl(filename, projectId))
 }
 
 export interface Schedule {
@@ -187,6 +260,7 @@ export interface Schedule {
   cronExpression: string
   mode: 'baseline' | 'test'
   enabled: boolean
+  projectId?: string
   createdAt: number
   lastRun: number | null
 }
@@ -195,22 +269,22 @@ export async function getSchedules(): Promise<Schedule[]> {
   return request<Schedule[]>('/api/schedules')
 }
 
-export async function addSchedule(s: { name: string; cronExpression: string; mode: string; enabled: boolean }): Promise<Schedule> {
+export async function addSchedule(s: { name: string; cronExpression: string; mode: string; enabled: boolean; projectId?: string }): Promise<Schedule> {
   return request<Schedule>('/api/schedules', {
     method: 'POST',
     body: JSON.stringify(s),
   })
 }
 
-export async function updateSchedule(id: string, updates: Partial<Schedule>): Promise<Schedule> {
-  return request<Schedule>(`/api/schedules?id=${encodeURIComponent(id)}`, {
+export async function updateSchedule(id: string, updates: Partial<Schedule>, projectId?: string): Promise<Schedule> {
+  return request<Schedule>(`/api/schedules?id=${encodeURIComponent(id)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`, {
     method: 'PUT',
     body: JSON.stringify(updates),
   })
 }
 
-export async function deleteSchedule(id: string): Promise<void> {
-  await request(`/api/schedules?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+export async function deleteSchedule(id: string, projectId?: string): Promise<void> {
+  await request(`/api/schedules?id=${encodeURIComponent(id)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`, { method: 'DELETE' })
 }
 
 export function validateCron(cronExpression: string): { valid: boolean; nextRun: string | null } {
@@ -219,45 +293,40 @@ export function validateCron(cronExpression: string): { valid: boolean; nextRun:
 }
 
 // Ignore Zones
-export interface IgnoreZone {
-  id: string
-  name: string
-  type: 'bounding-box' | 'selector'
-  x?: number
-  y?: number
-  width?: number
-  height?: number
-  selector?: string
-  enabled: boolean
+export async function getIgnoreZones(pageName?: string, projectId?: string): Promise<IgnoreZone[]> {
+  const params = []
+  if (pageName) params.push(`page=${encodeURIComponent(pageName)}`)
+  if (projectId) params.push(`project=${encodeURIComponent(projectId)}`)
+  return request<IgnoreZone[]>(`/api/ignore-zones${params.length ? `?${params.join('&')}` : ''}`)
 }
 
-export async function getIgnoreZones(pageName?: string): Promise<IgnoreZone[]> {
-  const params = pageName ? `?page=${encodeURIComponent(pageName)}` : ''
-  return request<IgnoreZone[]>(`/api/ignore-zones${params}`)
+export async function getIgnoreZonesAll(projectId?: string): Promise<{ global: IgnoreZone[]; pages: Record<string, IgnoreZone[]> }> {
+  return request(`/api/ignore-zones${projectId ? `?project=${encodeURIComponent(projectId)}` : ''}`)
 }
 
-export async function getIgnoreZonesAll(): Promise<{ global: IgnoreZone[]; pages: Record<string, IgnoreZone[]> }> {
-  return request(`/api/ignore-zones`)
-}
-
-export async function createIgnoreZone(zone: Omit<IgnoreZone, 'id'> & { pageName?: string }): Promise<IgnoreZone> {
-  return request<IgnoreZone>('/api/ignore-zones', {
+export async function createIgnoreZone(zone: Omit<IgnoreZone, 'id'> & { pageName?: string; projectId?: string }): Promise<IgnoreZone> {
+  const { projectId, ...rest } = zone
+  return request<IgnoreZone>(`/api/ignore-zones${projectId ? `?project=${encodeURIComponent(projectId)}` : ''}`, {
     method: 'POST',
-    body: JSON.stringify(zone),
+    body: JSON.stringify(rest),
   })
 }
 
-export async function updateIgnoreZone(id: string, updates: Partial<IgnoreZone>, pageName?: string): Promise<void> {
-  const params = pageName ? `?page=${encodeURIComponent(pageName)}` : ''
-  await request(`/api/ignore-zones/${id}${params}`, {
+export async function updateIgnoreZone(id: string, updates: Partial<IgnoreZone>, pageName?: string, projectId?: string): Promise<void> {
+  const params = []
+  if (pageName) params.push(`page=${encodeURIComponent(pageName)}`)
+  if (projectId) params.push(`project=${encodeURIComponent(projectId)}`)
+  await request(`/api/ignore-zones/${id}${params.length ? `?${params.join('&')}` : ''}`, {
     method: 'PUT',
     body: JSON.stringify(updates),
   })
 }
 
-export async function deleteIgnoreZone(id: string, pageName?: string): Promise<void> {
-  const params = pageName ? `?page=${encodeURIComponent(pageName)}` : ''
-  await request(`/api/ignore-zones/${id}${params}`, { method: 'DELETE' })
+export async function deleteIgnoreZone(id: string, pageName?: string, projectId?: string): Promise<void> {
+  const params = []
+  if (pageName) params.push(`page=${encodeURIComponent(pageName)}`)
+  if (projectId) params.push(`project=${encodeURIComponent(projectId)}`)
+  await request(`/api/ignore-zones/${id}${params.length ? `?${params.join('&')}` : ''}`, { method: 'DELETE' })
 }
 
 // Crawl
@@ -273,15 +342,16 @@ export interface CrawlJob {
   status: 'pending' | 'running' | 'completed' | 'failed'
   startUrl: string
   discoveredPages: DiscoveredPage[]
+  projectId?: string
   error?: string
   createdAt: string
   updatedAt: string
 }
 
-export async function startCrawl(url: string, crawlConfig: Record<string, unknown> = {}): Promise<{ jobId: string }> {
+export async function startCrawl(url: string, crawlConfig: Record<string, unknown> = {}, projectId?: string): Promise<{ jobId: string }> {
   return request<{ jobId: string }>('/api/crawl', {
     method: 'POST',
-    body: JSON.stringify({ url, config: crawlConfig }),
+    body: JSON.stringify({ url, config: crawlConfig, projectId }),
   })
 }
 

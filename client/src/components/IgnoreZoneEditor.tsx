@@ -25,6 +25,7 @@ interface Props {
   pageName: string | null
   baselineUrl: string
   initialZones: IgnoreZone[]
+  projectId?: string
   onSaved: () => void
   onClose: () => void
 }
@@ -40,7 +41,7 @@ interface DrawState {
 const TEST_ATTRS = ['data-testid', 'data-cy', 'data-test', 'data-e2e', 'id'] as const
 type TestAttr = (typeof TEST_ATTRS)[number]
 
-export default function IgnoreZoneEditor({ pageName, baselineUrl, initialZones, onSaved, onClose }: Props) {
+export default function IgnoreZoneEditor({ pageName, baselineUrl, initialZones, projectId, onSaved, onClose }: Props) {
   const hasBaseline = !!baselineUrl
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
@@ -170,7 +171,7 @@ export default function IgnoreZoneEditor({ pageName, baselineUrl, initialZones, 
       // Delete removed zones
       for (const old of initialZones) {
         if (!zones.find((z) => z.id === old.id)) {
-          await deleteIgnoreZone(old.id, pageName ?? undefined)
+          await deleteIgnoreZone(old.id, pageName ?? undefined, projectId)
         }
       }
       // Create new zones and update existing
@@ -178,9 +179,9 @@ export default function IgnoreZoneEditor({ pageName, baselineUrl, initialZones, 
         if (zone.id.startsWith('temp-')) {
           const { id: _tmpId, ...rest } = zone
           void _tmpId
-          await createIgnoreZone({ ...rest, pageName: pageName ?? undefined })
+          await createIgnoreZone({ ...rest, pageName: pageName ?? undefined, projectId })
         } else {
-          await updateIgnoreZone(zone.id, zone, pageName ?? undefined)
+          await updateIgnoreZone(zone.id, zone, pageName ?? undefined, projectId)
         }
       }
       toast.success('Ignore zones saved')

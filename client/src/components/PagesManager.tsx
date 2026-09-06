@@ -12,6 +12,7 @@ import {
 import { toast } from 'sonner'
 import { getPages, addPage, updatePage, deletePage, dispatchRun, getImageUrl } from '../api'
 import type { PageConfig } from '../api'
+import { useProject } from '@/contexts/ProjectContext'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -40,15 +41,17 @@ type LoadingState = Record<string, 'baseline' | 'test' | null>
 
 function PageThumbnail({
   name,
+  projectId,
   refreshKey,
   onPreview,
 }: {
   name: string
+  projectId?: string
   refreshKey: number
   onPreview: (url: string) => void
 }) {
   const [hidden, setHidden] = useState(false)
-  const url = `${getImageUrl('baseline', name)}&t=${refreshKey}`
+  const url = `${getImageUrl('baseline', name, projectId)}&t=${refreshKey}`
 
   return hidden ? (
     <div className="flex size-[60px] items-center justify-center rounded-md border bg-muted text-[10px] text-muted-foreground">
@@ -67,6 +70,8 @@ function PageThumbnail({
 }
 
 export default function PagesManager() {
+  const { project } = useProject()
+  const projectId = project?.id
   const [pages, setPages] = useState<PageConfig[]>([])
   const [editing, setEditing] = useState<PageConfig | null>(null)
   const [isNew, setIsNew] = useState(false)
@@ -77,11 +82,12 @@ export default function PagesManager() {
   const [originalName, setOriginalName] = useState<string | null>(null)
   const [preview, setPreview] = useState<{ name: string; url: string } | null>(null)
 
-  const refresh = useCallback(() => getPages().then(setPages), [])
+  const refresh = useCallback(() => getPages(projectId).then(setPages), [projectId])
 
   useEffect(() => {
-    getPages().then(setPages).catch(() => toast.error('Failed to load pages'))
-  }, [])
+    if (!projectId) return
+    getPages(projectId).then(setPages).catch(() => toast.error('Failed to load pages'))
+  }, [projectId])
 
   const closeEditor = () => {
     setEditing(null)
@@ -99,10 +105,10 @@ export default function PagesManager() {
     setError('')
     try {
       if (isNew) {
-        await addPage(editing)
+        await addPage(editing, projectId)
         toast.success(`Page "${editing.name}" added`)
       } else {
-        await updatePage(originalName!, editing)
+        await updatePage(originalName!, editing, projectId)
         toast.success(`Page "${editing.name}" updated`)
       }
       closeEditor()
@@ -115,7 +121,7 @@ export default function PagesManager() {
   const handleDelete = async () => {
     if (!deleteTarget) return
     try {
-      await deletePage(deleteTarget.name)
+      await deletePage(deleteTarget.name, projectId)
       toast.success(`Page "${deleteTarget.name}" deleted`)
       setDeleteTarget(null)
       await refresh()
@@ -143,7 +149,7 @@ export default function PagesManager() {
     setLoadingPages((prev) => ({ ...prev, [name]: mode }))
     setError('')
     try {
-      await dispatchRun(mode, { pages: [name] })
+      await dispatchRun(mode, { pages: [name], projectId })
       await new Promise((r) => setTimeout(r, 15000))
       await refresh()
       setRefreshKey((k) => k + 1)
@@ -161,7 +167,7 @@ export default function PagesManager() {
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Pages</h1>
           <p className="text-sm text-muted-foreground">
-            Pages under visual regression monitoring.
+            {project ? `Pages under visual regression monitoring for "${project.name}".` : 'Pages under visual regression monitoring.'}
           </p>
         </div>
         <Button onClick={startNew}>
@@ -205,6 +211,7 @@ export default function PagesManager() {
                     <TableCell>
                       <PageThumbnail
                         name={p.name}
+                        projectId={projectId}
                         refreshKey={refreshKey}
                         onPreview={(url) => setPreview({ name: p.name, url })}
                       />
