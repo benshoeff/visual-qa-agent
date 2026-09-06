@@ -90,16 +90,23 @@ export default function RunHistory() {
       .then(async (files) => {
         if (cancelled) return
         const parsed: Run[] = []
-        for (const file of files) {
-          try {
-            const html = await fetchReportHtml(file.filename, projectId)
-            const { summary, pages } = parseReport(html)
-            parsed.push({ file, summary, pages })
-          } catch {
-            parsed.push({ file, summary: null, pages: [] })
+        const CONCURRENCY = 6
+        let idx = 0
+        async function worker() {
+          while (idx < files.length && !cancelled) {
+            const file = files[idx++]
+            try {
+              const html = await fetchReportHtml(file.filename, projectId)
+              const { summary, pages } = parseReport(html)
+              parsed.push({ file, summary, pages })
+            } catch {
+              parsed.push({ file, summary: null, pages: [] })
+            }
           }
-          if (cancelled) return
         }
+        await Promise.all(
+          Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker())
+        )
         if (!cancelled) setRuns(parsed)
       })
       .catch(() => {

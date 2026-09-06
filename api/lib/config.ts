@@ -39,6 +39,13 @@ interface GitContent {
 export async function getFileText(path: string): Promise<{ content: string; sha?: string } | null> {
   try {
     const data = await gh<GitContent>(`/repos/${repo()}/contents/${path}?ref=${branch()}`);
+    // Files larger than 1MB: the contents API returns empty content. Fetch the blob directly.
+    if (data.sha && !data.content) {
+      const blob = await gh<GitContent>(`/repos/${repo()}/git/blobs/${data.sha}`);
+      if (blob.content) {
+        return { content: Buffer.from(blob.content, "base64").toString("utf-8"), sha: data.sha };
+      }
+    }
     if (!data.content) return null;
     return {
       content: Buffer.from(data.content, "base64").toString("utf-8"),

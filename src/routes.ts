@@ -606,9 +606,10 @@ router.get("/reports", (req: Request, res: Response) => {
       .filter((f) => f.endsWith(".html"))
       .map((f) => {
         const stat = fs.statSync(path.join(dir, f));
+        const match = f.match(/report-(\d+)\.html/);
         return {
           filename: f,
-          timestamp: stat.mtimeMs,
+          timestamp: match ? parseInt(match[1], 10) : stat.mtimeMs,
           size: stat.size,
         };
       })
