@@ -4,7 +4,7 @@
     "name": "Nightly run",
     "cronExpression": "0 9 * * *",
     "mode": "test",
-    "enabled": true,
+    "enabled": false,
     "createdAt": 1788019197440,
     "lastRun": null
   }
