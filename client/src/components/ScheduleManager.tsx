@@ -57,7 +57,7 @@ interface EditorState {
 }
 
 export default function ScheduleManager() {
-  const { project } = useProject()
+  const { project, config } = useProject()
   const projectId = project?.id
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [editor, setEditor] = useState<EditorState | null>(null)
@@ -199,6 +199,7 @@ export default function ScheduleManager() {
                 <TableHead>Name</TableHead>
                 <TableHead>Schedule</TableHead>
                 <TableHead>Mode</TableHead>
+                <TableHead>Project</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Last Run</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -217,6 +218,11 @@ export default function ScheduleManager() {
                     <Badge variant="outline" className="capitalize">
                       {s.mode}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {s.projectId
+                      ? (config?.projects.find((p) => p.id === s.projectId)?.name ?? s.projectId)
+                      : 'Active project'}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

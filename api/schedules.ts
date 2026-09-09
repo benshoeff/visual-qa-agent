@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { loadConfig } from "./lib/config.js";
 
 const API = "https://api.github.com";
 
@@ -104,6 +105,7 @@ interface Schedule {
   cronExpression: string;
   mode: "baseline" | "test";
   enabled: boolean;
+  projectId?: string;
   createdAt: number;
   lastRun: number | null;
 }
@@ -135,12 +137,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const schedules = await loadSchedules();
 
     if (req.method === "GET") {
-      res.status(200).setHeaders(corsHeaders()).json(schedules);
+      const project = req.query.project as string | undefined;
+      const result = project
+        ? schedules.filter((s) => !s.projectId || s.projectId === project)
+        : schedules;
+      res.status(200).setHeaders(corsHeaders()).json(result);
       return;
     }
 
     if (req.method === "POST") {
-      const { name, cronExpression, mode, enabled } = req.body ?? {};
+      const { name, cronExpression, mode, enabled, projectId } = req.body ?? {};
       if (!name || !cronExpression || !mode) {
         res.status(400).setHeaders(corsHeaders()).json({ error: "name, cronExpression, and mode are required" });
         return;
@@ -149,12 +155,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(400).setHeaders(corsHeaders()).json({ error: "Invalid cron expression" });
         return;
       }
+      let project: string | undefined;
+      if (projectId) {
+        const config = await loadConfig();
+        if (!config.projects.some((p) => p.id === projectId)) {
+          res.status(400).setHeaders(corsHeaders()).json({ error: "Project not found" });
+          return;
+        }
+        project = projectId;
+      }
       const schedule: Schedule = {
         id: crypto.randomUUID(),
         name,
         cronExpression,
         mode,
         enabled: enabled ?? true,
+        ...(project ? { projectId: project } : {}),
         createdAt: Date.now(),
         lastRun: null,
       };
