@@ -17,5 +17,15 @@
     "projectId": "my-site",
     "createdAt": 1788965891608,
     "lastRun": null
+  },
+  {
+    "id": "09afde4c-88bc-4a6b-9b09-6c94a419f40e",
+    "name": "test",
+    "cronExpression": "0 * * * *",
+    "mode": "test",
+    "enabled": true,
+    "projectId": "my-site",
+    "createdAt": 1789030952817,
+    "lastRun": null
   }
 ]
