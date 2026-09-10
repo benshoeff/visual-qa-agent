@@ -120,7 +120,7 @@ jobs:
         run: |
           git config user.name "visual-qa-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add config.json schedules.json baselines current diffs reports crawl-results crawl-jobs .github/workflows/visual-qa.yml 2>/dev/null || true
+          git add -A config.json schedules.json baselines current diffs reports crawl-results crawl-jobs .github/workflows/visual-qa.yml 2>/dev/null || git add -A
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
