@@ -27,5 +27,15 @@
     "projectId": "my-site",
     "createdAt": 1789030952817,
     "lastRun": null
+  },
+  {
+    "id": "d2476287-f2e4-4bdf-84e3-af077537a032",
+    "name": "בדיקה",
+    "cronExpression": "0 * * * *",
+    "mode": "test",
+    "enabled": true,
+    "projectId": "default",
+    "createdAt": 1789030974304,
+    "lastRun": null
   }
 ]
