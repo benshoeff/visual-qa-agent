@@ -2,6 +2,7 @@ name: Visual QA Engine
 
 on:
   schedule:
+    - cron: '0 * * * *'
     - cron: '0 9 * * *'
   workflow_dispatch:
     inputs:

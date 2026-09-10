@@ -116,11 +116,70 @@ async function loadSchedules(): Promise<Schedule[]> {
   return JSON.parse(file.content) as Schedule[];
 }
 
+const WORKFLOW_PATH = ".github/workflows/visual-qa.yml";
+const MAX_CRONS = 10;
+const SENTINEL_CRON = "0 9 * * *";
+
+function buildCronList(schedules: Schedule[]): string[] {
+  const crons: string[] = [];
+  for (const s of schedules) {
+    if (!s.enabled) continue;
+    const cron = typeof s.cronExpression === "string" ? s.cronExpression.trim() : "";
+    if (cron && !crons.includes(cron)) crons.push(cron);
+  }
+  crons.sort();
+  if (crons.length === 0) crons.push(SENTINEL_CRON);
+  return crons.slice(0, MAX_CRONS);
+}
+
+function renderScheduleBlock(crons: string[]): string {
+  const lines = crons.map((c) => `    - cron: '${c}'`);
+  return `  schedule:\n${lines.join("\n")}\n`;
+}
+
+function rewriteWorkflow(yml: string, block: string): string {
+  const re = /^  schedule:\n(?:    - cron: '[^']*'\n)+/m;
+  if (!re.test(yml)) return yml;
+  return yml.replace(re, block);
+}
+
 async function saveSchedules(schedules: Schedule[], message: string): Promise<void> {
-  await commitFiles(
-    [{ path: "schedules.json", content: JSON.stringify(schedules, null, 2) }],
-    message
-  );
+  const changes: Array<{ path: string; content: string }> = [
+    { path: "schedules.json", content: JSON.stringify(schedules, null, 2) },
+  ];
+
+  // Keep the GitHub Actions `schedule:` block in sync so cron changes take
+  // effect immediately (no need to wait for the next scheduled run).
+  try {
+    const wf = await getFileText(WORKFLOW_PATH);
+    if (wf) {
+      const next = rewriteWorkflow(wf.content, renderScheduleBlock(buildCronList(schedules)));
+      if (next !== wf.content) {
+        changes.push({ path: WORKFLOW_PATH, content: next });
+      }
+    }
+  } catch (err) {
+    console.error("⚠️  Could not read workflow yaml for cron sync:", (err as Error).message);
+  }
+
+  try {
+    await commitFiles(changes, message);
+  } catch (err) {
+    // If the token cannot push workflow files (missing `workflows` scope),
+    // fall back to committing schedules.json alone.
+    if (changes.some((c) => c.path === WORKFLOW_PATH)) {
+      console.warn(
+        "⚠️  Workflow commit rejected, retrying with schedules.json only:",
+        (err as Error).message
+      );
+      await commitFiles(
+        [{ path: "schedules.json", content: JSON.stringify(schedules, null, 2) }],
+        message
+      );
+      return;
+    }
+    throw err;
+  }
 }
 
 function isValidCron(cronExpression: string): boolean {
