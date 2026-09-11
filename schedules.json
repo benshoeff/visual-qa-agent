@@ -26,7 +26,7 @@
     "enabled": true,
     "projectId": "my-site",
     "createdAt": 1789030952817,
-    "lastRun": null
+    "lastRun": 1789128322361
   },
   {
     "id": "d2476287-f2e4-4bdf-84e3-af077537a032",
@@ -36,6 +36,6 @@
     "enabled": true,
     "projectId": "default",
     "createdAt": 1789030974304,
-    "lastRun": null
+    "lastRun": 1789128550420
   }
 ]
