@@ -1,99 +1,71 @@
 import fs from "fs";
 import path from "path";
 import cron, { type ScheduledTask } from "node-cron";
+import { parse as parseYaml } from "yaml";
 import { readConfig, getProject } from "./config.js";
 import { runBaseline, runTest } from "./agent.js";
 
 export interface Schedule {
-  id: string;
   name: string;
   cronExpression: string;
   mode: "baseline" | "test";
   enabled: boolean;
   projectId?: string;
-  createdAt: number;
   lastRun: number | null;
+  status: "pending" | "pass" | "fail";
 }
 
-const SCHEDULES_PATH = path.join(process.cwd(), "schedules.json");
+const SCHEDULES_PATH = path.join(process.cwd(), "schedules.yml");
+const STATUS_PATH = path.join(process.cwd(), "schedules-status.json");
+
+interface ScheduleDef {
+  name: string;
+  cron: string;
+  mode?: string;
+  enabled?: boolean;
+  projectId?: string;
+}
+
+function readStatus(): Record<string, { lastRun?: number; status?: string }> {
+  if (!fs.existsSync(STATUS_PATH)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(STATUS_PATH, "utf-8"));
+  } catch {
+    return {};
+  }
+}
+
+function normalizeStatus(raw?: string): "pending" | "pass" | "fail" {
+  return raw === "pass" || raw === "fail" ? raw : "pending";
+}
 
 function readSchedules(): Schedule[] {
   if (!fs.existsSync(SCHEDULES_PATH)) return [];
-  return JSON.parse(fs.readFileSync(SCHEDULES_PATH, "utf-8"));
-}
+  const doc = parseYaml(fs.readFileSync(SCHEDULES_PATH, "utf-8")) as {
+    schedules?: ScheduleDef[];
+  };
+  if (!Array.isArray(doc?.schedules)) return [];
 
-function writeSchedules(schedules: Schedule[]): void {
-  fs.writeFileSync(
-    SCHEDULES_PATH,
-    JSON.stringify(schedules, null, 2),
-    "utf-8"
-  );
+  const statuses = readStatus();
+  return doc.schedules.map((s) => {
+    const st = statuses[s.name] ?? {};
+    return {
+      name: s.name,
+      cronExpression: s.cron,
+      mode: s.mode === "baseline" ? "baseline" : "test",
+      enabled: s.enabled ?? true,
+      ...(s.projectId ? { projectId: s.projectId } : {}),
+      lastRun: st.lastRun ?? null,
+      status: normalizeStatus(st.status),
+    };
+  });
 }
 
 export function getSchedules(): Schedule[] {
   return readSchedules();
 }
 
-export function addSchedule(s: Omit<Schedule, "id" | "createdAt" | "lastRun">): Schedule {
-  const schedules = readSchedules();
-  const schedule: Schedule = {
-    ...s,
-    id: crypto.randomUUID(),
-    createdAt: Date.now(),
-    lastRun: null,
-  };
-  schedules.push(schedule);
-  writeSchedules(schedules);
-  startScheduleJob(schedule);
-  return schedule;
-}
-
-export function updateSchedule(id: string, updates: Partial<Schedule>): Schedule | null {
-  const schedules = readSchedules();
-  const idx = schedules.findIndex((s) => s.id === id);
-  if (idx === -1) return null;
-
-  const oldJob = jobs.get(id);
-  if (oldJob) {
-    oldJob.stop();
-    jobs.delete(id);
-  }
-
-  schedules[idx] = { ...schedules[idx], ...updates };
-  writeSchedules(schedules);
-
-  if (schedules[idx].enabled) {
-    startScheduleJob(schedules[idx]);
-  }
-
-  return schedules[idx];
-}
-
-export function deleteSchedule(id: string): boolean {
-  const schedules = readSchedules();
-  const idx = schedules.findIndex((s) => s.id === id);
-  if (idx === -1) return false;
-
-  const oldJob = jobs.get(id);
-  if (oldJob) {
-    oldJob.stop();
-    jobs.delete(id);
-  }
-
-  schedules.splice(idx, 1);
-  writeSchedules(schedules);
-  return true;
-}
-
 const jobs = new Map<string, ScheduledTask>();
-
-export function updateLastRun(id: string): void {
-  const schedules = readSchedules();
-  const idx = schedules.findIndex((s) => s.id === id);
-  if (idx === -1) return;
-  schedules[idx].lastRun = Date.now();
-  writeSchedules(schedules);
-}
 
 function startScheduleJob(schedule: Schedule) {
   if (!cron.validate(schedule.cronExpression)) {
@@ -118,13 +90,12 @@ function startScheduleJob(schedule: Schedule) {
         const failed = results.filter((r) => !r.passed).length;
         console.log(`   📊 ${schedule.name}: ${passed} passed, ${failed} failed`);
       }
-      updateLastRun(schedule.id);
     } catch (err) {
       console.error(`   ❌ ${schedule.name} failed:`, (err as Error).message);
     }
   });
 
-  jobs.set(schedule.id, job);
+  jobs.set(schedule.name, job);
   console.log(`   ⏰ Scheduled "${schedule.name}": ${schedule.cronExpression} (${schedule.mode})`);
 }
 
@@ -136,12 +107,4 @@ export function initScheduler(): void {
       startScheduleJob(s);
     }
   }
-}
-
-export function previewNextRun(cronExpression: string): string | null {
-  if (!cron.validate(cronExpression)) return null;
-  const task = cron.schedule(cronExpression, () => {});
-  const next = task.getNextRun();
-  task.stop();
-  return next ? next.toISOString() : null;
 }

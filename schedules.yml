@@ -1,0 +1,25 @@
+# Scheduled test runs — single source of truth.
+# Edit this file and push to change schedules; no UI editing is available.
+# The workflow ticks every hour and runs every enabled schedule whose time has come.
+# Cron expressions are interpreted in UTC (same convention as GitHub Actions).
+# `projectId` is optional: omit it to run the active project.
+schedules:
+  - name: Nightly run
+    cron: "0 9 * * *"
+    mode: test
+    enabled: true
+  - name: Nightly run website
+    cron: "0 9 * * *"
+    mode: test
+    enabled: true
+    projectId: my-site
+  - name: test
+    cron: "0 * * * *"
+    mode: test
+    enabled: true
+    projectId: my-site
+  - name: בדיקה
+    cron: "0 * * * *"
+    mode: test
+    enabled: true
+    projectId: default

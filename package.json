@@ -26,6 +26,7 @@
     "axe-playwright": "^2.2.2",
     "bullmq": "^5.80.0",
     "cors": "^2.8.6",
+    "cron-parser": "^4.9.0",
     "express": "^4.21.0",
     "ioredis": "^5.11.1",
     "lighthouse": "^12.8.2",
@@ -36,6 +37,7 @@
     "pngjs": "^7.0.0",
     "tsx": "^4.11.0",
     "uuid": "^14.0.1",
+    "yaml": "^2.9.0",
     "zod": "^3.25.76",
     "zod-to-json-schema": "^3.25.2"
   },

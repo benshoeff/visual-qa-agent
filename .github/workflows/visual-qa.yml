@@ -3,7 +3,6 @@ name: Visual QA Engine
 on:
   schedule:
     - cron: '0 * * * *'
-    - cron: '0 9 * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -83,14 +82,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Sync schedule crons
-        if: github.event_name == 'schedule'
-        run: node scripts/sync-crons.mjs
-
       - name: Run scheduled jobs
         if: github.event_name == 'schedule'
-        env:
-          TRIGGERED_CRON: ${{ github.event.schedule }}
         run: npm run run:scheduled
 
       - name: Run crawl

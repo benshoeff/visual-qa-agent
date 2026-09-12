@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { loadConfig } from "./lib/config.js";
+import { parse as parseYaml } from "yaml";
 
 const API = "https://api.github.com";
 
@@ -27,250 +27,89 @@ async function gh<T>(path: string, options: RequestInit = {}): Promise<T> {
     const text = await res.text();
     throw new Error(`GitHub API ${res.status}: ${text.slice(0, 500)}`);
   }
-  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
 interface GitContent {
-  sha?: string;
   encoding?: string;
   content?: string;
-  size?: number;
-  type?: string;
 }
 
-async function getFileText(path: string): Promise<{ content: string; sha?: string } | null> {
+async function getFileText(path: string): Promise<string | null> {
   try {
     const data = await gh<GitContent>(`/repos/${repo()}/contents/${path}?ref=${branch()}`);
     if (!data.content) return null;
-    return {
-      content: Buffer.from(data.content, "base64").toString("utf-8"),
-      sha: data.sha,
-    };
+    return Buffer.from(data.content, "base64").toString("utf-8");
   } catch (err) {
     if ((err as Error).message.includes("404")) return null;
     throw err;
   }
 }
 
-async function commitFiles(
-  changes: Array<{ path: string; content: string }>,
-  message: string,
-  deletePaths: string[] = []
-): Promise<void> {
-  const refData = await gh<{ object: { sha: string } }>(`/repos/${repo()}/git/ref/heads/${branch()}`);
-  const baseSha = refData.object.sha;
-
-  const treeItems = [];
-  for (const change of changes) {
-    const blob = await gh<{ sha: string }>(`/repos/${repo()}/git/blobs`, {
-      method: "POST",
-      body: JSON.stringify({ content: change.content, encoding: "utf-8" }),
-    });
-    treeItems.push({ path: change.path, mode: "100644", type: "blob", sha: blob.sha });
-  }
-  for (const del of deletePaths) {
-    treeItems.push({ path: del, mode: "100644", type: "blob", sha: null });
-  }
-
-  const tree = await gh<{ sha: string }>(`/repos/${repo()}/git/trees`, {
-    method: "POST",
-    body: JSON.stringify({ base_tree: baseSha, tree: treeItems }),
-  });
-
-  const commit = await gh<{ sha: string }>(`/repos/${repo()}/git/commits`, {
-    method: "POST",
-    body: JSON.stringify({ message, tree: tree.sha, parents: [baseSha] }),
-  });
-
-  await gh(`/repos/${repo()}/git/refs/heads/${branch()}`, {
-    method: "PATCH",
-    body: JSON.stringify({ sha: commit.sha, force: false }),
-  });
-}
-
 function corsHeaders(): Headers {
   return new Headers({
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Content-Type": "application/json",
   });
 }
 
-// Reflects the Schedule type from the serverless workflow consumer.
-interface Schedule {
-  id: string;
+interface ScheduleDef {
   name: string;
-  cronExpression: string;
+  cron: string;
   mode: "baseline" | "test";
-  enabled: boolean;
+  enabled?: boolean;
   projectId?: string;
-  createdAt: number;
-  lastRun: number | null;
 }
 
-async function loadSchedules(): Promise<Schedule[]> {
-  const file = await getFileText("schedules.json");
+interface StatusEntry {
+  lastRun?: number;
+  status?: "pass" | "fail";
+  projectId?: string;
+}
+
+async function loadSchedules(): Promise<ScheduleDef[]> {
+  const file = await getFileText("schedules.yml");
   if (!file) return [];
-  return JSON.parse(file.content) as Schedule[];
+  const doc = parseYaml(file) as { schedules?: ScheduleDef[] };
+  return Array.isArray(doc?.schedules) ? doc.schedules : [];
 }
 
-const WORKFLOW_PATH = ".github/workflows/visual-qa.yml";
-const MAX_CRONS = 10;
-const SENTINEL_CRON = "0 9 * * *";
-
-function buildCronList(schedules: Schedule[]): string[] {
-  const crons: string[] = [];
-  for (const s of schedules) {
-    if (!s.enabled) continue;
-    const cron = typeof s.cronExpression === "string" ? s.cronExpression.trim() : "";
-    if (cron && !crons.includes(cron)) crons.push(cron);
-  }
-  crons.sort();
-  if (crons.length === 0) crons.push(SENTINEL_CRON);
-  return crons.slice(0, MAX_CRONS);
+async function loadStatus(): Promise<Record<string, StatusEntry>> {
+  const file = await getFileText("schedules-status.json");
+  if (!file) return {};
+  return JSON.parse(file) as Record<string, StatusEntry>;
 }
 
-function renderScheduleBlock(crons: string[]): string {
-  const lines = crons.map((c) => `    - cron: '${c}'`);
-  return `  schedule:\n${lines.join("\n")}\n`;
-}
-
-function rewriteWorkflow(yml: string, block: string): string {
-  const re = /^  schedule:\n(?:    - cron: '[^']*'\n)+/m;
-  if (!re.test(yml)) return yml;
-  return yml.replace(re, block);
-}
-
-async function saveSchedules(schedules: Schedule[], message: string): Promise<void> {
-  const changes: Array<{ path: string; content: string }> = [
-    { path: "schedules.json", content: JSON.stringify(schedules, null, 2) },
-  ];
-
-  // Keep the GitHub Actions `schedule:` block in sync so cron changes take
-  // effect immediately (no need to wait for the next scheduled run).
-  try {
-    const wf = await getFileText(WORKFLOW_PATH);
-    if (wf) {
-      const next = rewriteWorkflow(wf.content, renderScheduleBlock(buildCronList(schedules)));
-      if (next !== wf.content) {
-        changes.push({ path: WORKFLOW_PATH, content: next });
-      }
-    }
-  } catch (err) {
-    console.error("⚠️  Could not read workflow yaml for cron sync:", (err as Error).message);
-  }
-
-  try {
-    await commitFiles(changes, message);
-  } catch (err) {
-    // If the token cannot push workflow files (missing `workflows` scope),
-    // fall back to committing schedules.json alone.
-    if (changes.some((c) => c.path === WORKFLOW_PATH)) {
-      console.warn(
-        "⚠️  Workflow commit rejected, retrying with schedules.json only:",
-        (err as Error).message
-      );
-      await commitFiles(
-        [{ path: "schedules.json", content: JSON.stringify(schedules, null, 2) }],
-        message
-      );
-      return;
-    }
-    throw err;
-  }
-}
-
-function isValidCron(cronExpression: string): boolean {
-  // 5-field cron: minute hour day month day-of-week
-  return /^(\*|[0-9]+)(\s+(\*|[0-9]+)){4}$/.test(cronExpression.trim());
-}
-
+// Read-only: schedules are defined only in schedules.yml. The UI just displays
+// the definitions plus the latest run facts recorded by the workflow.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") {
     res.status(200).setHeaders(corsHeaders()).end();
     return;
   }
-  try {
-    const schedules = await loadSchedules();
 
-    if (req.method === "GET") {
-      const project = req.query.project as string | undefined;
-      const result = project
-        ? schedules.filter((s) => !s.projectId || s.projectId === project)
-        : schedules;
-      res.status(200).setHeaders(corsHeaders()).json(result);
-      return;
-    }
-
-    if (req.method === "POST") {
-      const { name, cronExpression, mode, enabled, projectId } = req.body ?? {};
-      if (!name || !cronExpression || !mode) {
-        res.status(400).setHeaders(corsHeaders()).json({ error: "name, cronExpression, and mode are required" });
-        return;
-      }
-      if (!isValidCron(cronExpression)) {
-        res.status(400).setHeaders(corsHeaders()).json({ error: "Invalid cron expression" });
-        return;
-      }
-      let project: string | undefined;
-      if (projectId) {
-        const config = await loadConfig();
-        if (!config.projects.some((p) => p.id === projectId)) {
-          res.status(400).setHeaders(corsHeaders()).json({ error: "Project not found" });
-          return;
-        }
-        project = projectId;
-      }
-      const schedule: Schedule = {
-        id: crypto.randomUUID(),
-        name,
-        cronExpression,
-        mode,
-        enabled: enabled ?? true,
-        ...(project ? { projectId: project } : {}),
-        createdAt: Date.now(),
-        lastRun: null,
-      };
-      schedules.push(schedule);
-      await saveSchedules(schedules, `Add schedule ${name} via UI`);
-      res.status(201).setHeaders(corsHeaders()).json(schedule);
-      return;
-    }
-
-    if (req.method === "PUT") {
-      const id = req.query.id as string;
-      const idx = schedules.findIndex((s) => s.id === id);
-      if (idx === -1) {
-        res.status(404).setHeaders(corsHeaders()).json({ error: "Schedule not found" });
-        return;
-      }
-      const updates = req.body ?? {};
-      if (updates.cronExpression && !isValidCron(updates.cronExpression)) {
-        res.status(400).setHeaders(corsHeaders()).json({ error: "Invalid cron expression" });
-        return;
-      }
-      schedules[idx] = { ...schedules[idx], ...updates, id };
-      await saveSchedules(schedules, `Update schedule ${schedules[idx].name} via UI`);
-      res.status(200).setHeaders(corsHeaders()).json(schedules[idx]);
-      return;
-    }
-
-    if (req.method === "DELETE") {
-      const id = req.query.id as string;
-      const idx = schedules.findIndex((s) => s.id === id);
-      if (idx === -1) {
-        res.status(404).setHeaders(corsHeaders()).json({ error: "Schedule not found" });
-        return;
-      }
-      const [removed] = schedules.splice(idx, 1);
-      await saveSchedules(schedules, `Delete schedule ${removed.name} via UI`);
-      res.status(200).setHeaders(corsHeaders()).json({ deleted: true });
-      return;
-    }
-
+  if (req.method !== "GET") {
     res.status(405).setHeaders(corsHeaders()).json({ error: "Method not allowed" });
+    return;
+  }
+
+  try {
+    const [defs, statuses] = await Promise.all([loadSchedules(), loadStatus()]);
+    const result = defs.map((s) => {
+      const st = statuses[s.name] ?? {};
+      return {
+        name: s.name,
+        cronExpression: s.cron,
+        mode: s.mode,
+        enabled: s.enabled ?? true,
+        ...(s.projectId ? { projectId: s.projectId } : {}),
+        lastRun: st.lastRun ?? null,
+        status: st.status ?? "pending",
+      };
+    });
+    res.status(200).setHeaders(corsHeaders()).json(result);
   } catch (err) {
     res.status(500).setHeaders(corsHeaders()).json({ error: (err as Error).message });
   }

@@ -255,41 +255,17 @@ export async function fetchReportHtml(filename: string, projectId?: string): Pro
 }
 
 export interface Schedule {
-  id: string
   name: string
   cronExpression: string
   mode: 'baseline' | 'test'
   enabled: boolean
   projectId?: string
-  createdAt: number
   lastRun: number | null
+  status: 'pending' | 'pass' | 'fail'
 }
 
 export async function getSchedules(): Promise<Schedule[]> {
   return request<Schedule[]>('/api/schedules')
-}
-
-export async function addSchedule(s: { name: string; cronExpression: string; mode: string; enabled: boolean; projectId?: string }): Promise<Schedule> {
-  return request<Schedule>('/api/schedules', {
-    method: 'POST',
-    body: JSON.stringify(s),
-  })
-}
-
-export async function updateSchedule(id: string, updates: Partial<Schedule>, projectId?: string): Promise<Schedule> {
-  return request<Schedule>(`/api/schedules?id=${encodeURIComponent(id)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`, {
-    method: 'PUT',
-    body: JSON.stringify(updates),
-  })
-}
-
-export async function deleteSchedule(id: string, projectId?: string): Promise<void> {
-  await request(`/api/schedules?id=${encodeURIComponent(id)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`, { method: 'DELETE' })
-}
-
-export function validateCron(cronExpression: string): { valid: boolean; nextRun: string | null } {
-  const valid = /^(\*|[0-9]+)(\s+(\*|[0-9]+)){4}$/.test(cronExpression.trim())
-  return { valid, nextRun: valid ? 'Pending (runs via GitHub Actions schedule)' : null }
 }
 
 // Ignore Zones

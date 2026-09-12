@@ -21,7 +21,7 @@ npx playwright install chromium
 npm run baseline            # צילום בייסליין ראשוני
 npm run test                # הרצת בדיקה מול הבייסליין
 npm run crawl               # גילוי עמודים + צילום בייסליין (CRAWL_URL...)
-npm run run:scheduled       # הרצת לוחות זמנים שהגיע זמנם (מ-schedules.json)
+npm run run:scheduled       # הרצת לוחות זמנים שהגיע זמנם (מ-schedules.yml)
 ```
 
 ### Web Dashboard (מקומי)
@@ -43,12 +43,12 @@ npm run server              # => http://localhost:3456
 | **Pages** | ניהול דפים לבדיקה – הוספה, עריכה, מחיקה (עדכון baseline מוחק את ה-current/diffs של הדף) |
 | **Test Runner** | הרצת baseline / test / crawl – מופעלת כ-Job אסינכרוני ב-GitHub Actions ומעודכן מעצמו |
 | **Reports** | צפייה בדוחות קודמים, השוואת תמונות עם Slider |
-| **Schedules** | ניהול לוחות זמנים לריצה אוטומטית |
+| **Schedules** | תצוגה בלבד – לוח הזמנים מוגדר ב-`schedules.yml` ב-repo (טיק שעתי של GitHub Actions מפעיל את ה-crons) |
 
 ## איך זה עובד
 
-1. ממשק ה-Vercel קורא/כותב קבצים (config.json, schedules.json, baselines, דוחות) ישירות ב-repo דרך GitHub API.
-2. הבדיקה הלילית רצה ע"י `schedule:` ישירות ב-GitHub Actions (ברירת מחדל `0 9 * * *` UTC – מוגדר ב-`.github/workflows/visual-qa.yml`), וריצות ידניות נקראות ע"י `workflow_dispatch` מהדאשבורד.
+1. ממשק ה-Vercel קורא קבצים (config.json, schedules.yml, schedules-status.json, baselines, דוחות) ישירות ב-repo דרך GitHub API. לוח הזמנים לקריאה בלבד.
+2. הבדיקות אוטומטיות רצות ע"י טיק שעתי ב-GitHub Actions (`0 * * * *` ב-`.github/workflows/visual-qa.yml`); `run-scheduled` מריץ כל schedule שזמנו הגיע לפי `schedules.yml` (UTC), וריצות ידניות נקראות ע"י `workflow_dispatch` מהדאשבורד.
 3. ה-Workflow מריץ את Playwright ומחזיר את התוצאות (baselines / current / diffs / reports) בחזרה ל-git – כך הדוחות זמינים בממשק.
 4. **Cleanup** – כל יום ראשון 03:00 UTC מנקה קבצים זמניים (reports, current, diffs, crawl-results).
 

@@ -8,13 +8,7 @@ import {
   runBaselineForPage,
   runTestForPage,
 } from "./agent.js";
-import {
-  getSchedules,
-  addSchedule,
-  updateSchedule,
-  deleteSchedule,
-  previewNextRun,
-} from "./scheduler.js";
+import { getSchedules } from "./scheduler.js";
 import { testCasesRouter } from "./routes/testCases.js";
 import { flakyTestsRouter } from "./routes/flakyTests.js";
 import { impactRouter } from "./routes/impact.js";
@@ -700,6 +694,7 @@ router.get("/files", (req: Request, res: Response) => {
 });
 
 // ─── Schedules ──────────────────────────────────────────────────────────
+// Read-only: schedules are defined in schedules.yml at the repo root.
 
 router.get("/schedules", (_req: Request, res: Response) => {
   try {
@@ -707,81 +702,5 @@ router.get("/schedules", (_req: Request, res: Response) => {
     res.json(schedules);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
-  }
-});
-
-router.post("/schedules", (req: Request, res: Response) => {
-  try {
-    const { name, cronExpression, mode, enabled, projectId } = req.body;
-    if (!name || !cronExpression || !mode) {
-      res.status(400).json({ error: "name, cronExpression, and mode are required" });
-      return;
-    }
-    const schedule = addSchedule({ name, cronExpression, mode, enabled: enabled ?? true, projectId });
-    res.status(201).json(schedule);
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
-
-router.put("/schedules/:id", (req: Request, res: Response) => {
-  try {
-    const schedule = updateSchedule(req.params.id as string, req.body);
-    if (!schedule) {
-      res.status(404).json({ error: "Schedule not found" });
-      return;
-    }
-    res.json(schedule);
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
-
-router.put("/schedules", (req: Request, res: Response) => {
-  try {
-    const schedule = updateSchedule(req.query.id as string, req.body);
-    if (!schedule) {
-      res.status(404).json({ error: "Schedule not found" });
-      return;
-    }
-    res.json(schedule);
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
-
-router.delete("/schedules/:id", (req: Request, res: Response) => {
-  try {
-    const deleted = deleteSchedule(req.params.id as string);
-    if (!deleted) {
-      res.status(404).json({ error: "Schedule not found" });
-      return;
-    }
-    res.json({ deleted: true });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
-
-router.delete("/schedules", (req: Request, res: Response) => {
-  try {
-    const deleted = deleteSchedule(req.query.id as string);
-    if (!deleted) {
-      res.status(404).json({ error: "Schedule not found" });
-      return;
-    }
-    res.json({ deleted: true });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
-
-router.post("/schedules/validate", (req: Request, res: Response) => {
-  try {
-    const { cronExpression } = req.body;
-    const nextRun = previewNextRun(cronExpression);
-    res.json({ valid: nextRun !== null, nextRun });
-  } catch {
-    res.json({ valid: false, nextRun: null });
   }
 });

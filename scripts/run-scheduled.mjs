@@ -1,43 +1,85 @@
-import cron from "node-cron";
-import fs from "fs";
-import { execSync } from "child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { execSync } from "node:child_process";
+import { parse as parseYaml } from "yaml";
+import cronParser from "cron-parser";
 
-const schedules = JSON.parse(fs.readFileSync("schedules.json", "utf-8"));
-const now = new Date();
+const { parseExpression } = cronParser;
 
-// When a GitHub Actions `schedule` event fired the workflow, github.event.schedule
-// tells us exactly which cron expression triggered it (GitHub often fires late, so
-// time-based matching alone would never hit). Otherwise fall back to cron.match.
-const triggered = process.env.TRIGGERED_CRON ? String(process.env.TRIGGERED_CRON).trim() : null;
+const root = process.cwd();
+const SCHEDULES_PATH = path.join(root, "schedules.yml");
+const STATUS_PATH = path.join(root, "schedules-status.json");
 
-const due = [];
-for (const s of schedules) {
-  if (!s.enabled) continue;
-  const expr = typeof s.cronExpression === "string" ? s.cronExpression.trim() : "";
-  if (triggered) {
-    if (expr === triggered) due.push(s);
-    continue;
+function loadSchedules() {
+  if (!fs.existsSync(SCHEDULES_PATH)) {
+    console.log("ℹ️ No schedules.yml found — nothing to run");
+    return [];
   }
   try {
-    if (expr && cron.match(expr, now)) due.push(s);
-  } catch {
-    continue;
+    const doc = parseYaml(fs.readFileSync(SCHEDULES_PATH, "utf-8"));
+    return Array.isArray(doc?.schedules) ? doc.schedules : [];
+  } catch (err) {
+    console.error("❌ Failed to parse schedules.yml:", err instanceof Error ? err.message : err);
+    return [];
   }
 }
 
-let ran = false;
-for (const s of due) {
-  ran = true;
+function loadStatus() {
+  if (!fs.existsSync(STATUS_PATH)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(STATUS_PATH, "utf-8"));
+  } catch {
+    return {};
+  }
+}
+
+// A schedule is due when its first occurrence after the last run (or ever, for
+// a schedule that never ran) is in the past. Expressions are evaluated in UTC
+// to match GitHub Actions scheduling. This makes the workflow a dumb hourly
+// "tick" and keeps schedules.yml the only place runs are defined.
+function isDue(expr, lastRunMs) {
+  try {
+    const base = lastRunMs != null ? new Date(lastRunMs) : new Date(0);
+    const interval = parseExpression(expr, { currentDate: base, tz: "Etc/UTC" });
+    return interval.next().toDate().getTime() <= Date.now();
+  } catch {
+    return false;
+  }
+}
+
+const status = loadStatus();
+const due = [];
+const today = new Date().toISOString();
+
+for (const s of loadSchedules()) {
+  if (!s.enabled) continue;
+  const expr = String(s.cron ?? "").trim();
+  if (!expr) continue;
+
+  const prev = status[s.name];
+  if (!isDue(expr, prev?.lastRun ?? null)) continue;
+
+  due.push(s);
   const mode = s.mode === "baseline" ? "baseline" : "test";
-  console.log(`\n⏰ Scheduled "${s.name}" → ${s.mode}${s.projectId ? ` [${s.projectId}]` : ""}`);
+  console.log(`\n⏰ Scheduled "${s.name}" → ${s.mode}${s.projectId ? ` [${s.projectId}]` : ""} (${today})`);
   const projectEnv = s.projectId ? `PROJECT=${JSON.stringify(s.projectId)} ` : "";
+  let ok = true;
   try {
     execSync(`${projectEnv}npm run ${mode}`, { stdio: "inherit" });
   } catch (err) {
+    ok = false;
     console.error(`   ❌ "${s.name}" failed: ${err instanceof Error ? err.message : err}`);
   }
-  s.lastRun = Date.now();
+  status[s.name] = {
+    lastRun: Date.now(),
+    status: ok ? "pass" : "fail",
+    ...(s.projectId ? { projectId: s.projectId } : {}),
+  };
 }
 
-fs.writeFileSync("schedules.json", JSON.stringify(schedules, null, 2), "utf-8");
-console.log(ran ? "\n✅ Scheduled run completed" : "ℹ️ No schedules due at this time");
+if (due.length) {
+  fs.writeFileSync(STATUS_PATH, JSON.stringify(status, null, 2), "utf-8");
+  console.log(`\n✅ Ran ${due.length} scheduled job(s)`);
+} else {
+  console.log("ℹ️ No schedules due at this time");
+}
