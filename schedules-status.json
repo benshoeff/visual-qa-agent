@@ -1,0 +1,21 @@
+{
+  "Nightly run": {
+    "lastRun": 1789208219930,
+    "status": "fail"
+  },
+  "Nightly run website": {
+    "lastRun": 1789208241532,
+    "status": "fail",
+    "projectId": "my-site"
+  },
+  "test": {
+    "lastRun": 1789208263146,
+    "status": "fail",
+    "projectId": "my-site"
+  },
+  "בדיקה": {
+    "lastRun": 1789208493498,
+    "status": "pass",
+    "projectId": "default"
+  }
+}
