@@ -39,6 +39,12 @@ function normalizeStatus(raw?: string): "pending" | "pass" | "fail" {
   return raw === "pass" || raw === "fail" ? raw : "pending";
 }
 
+// Status is stored per-project (`<projectId>::<name>`) so each project only ever
+// sees its own schedule run history. Legacy name-only entries act as a fallback.
+function statusKey(projectId: string, name: string): string {
+  return `${projectId || "__active__"}::${name}`;
+}
+
 function readSchedules(): Schedule[] {
   if (!fs.existsSync(SCHEDULES_PATH)) return [];
   const doc = parseYaml(fs.readFileSync(SCHEDULES_PATH, "utf-8")) as {
@@ -47,8 +53,10 @@ function readSchedules(): Schedule[] {
   if (!Array.isArray(doc?.schedules)) return [];
 
   const statuses = readStatus();
+  const activeProjectId = readConfig().activeProjectId ?? "";
   return doc.schedules.map((s) => {
-    const st = statuses[s.name] ?? {};
+    const projectId = s.projectId ?? activeProjectId;
+    const st = statuses[statusKey(projectId, s.name)] ?? statuses[s.name] ?? {};
     return {
       name: s.name,
       cronExpression: s.cron,
@@ -66,6 +74,10 @@ export function getSchedules(): Schedule[] {
 }
 
 const jobs = new Map<string, ScheduledTask>();
+
+function scheduleRunKey(schedule: Schedule): string {
+  return statusKey(schedule.projectId ?? "", schedule.name);
+}
 
 function startScheduleJob(schedule: Schedule) {
   if (!cron.validate(schedule.cronExpression)) {
@@ -95,7 +107,7 @@ function startScheduleJob(schedule: Schedule) {
     }
   });
 
-  jobs.set(schedule.name, job);
+  jobs.set(scheduleRunKey(schedule), job);
   console.log(`   ⏰ Scheduled "${schedule.name}": ${schedule.cronExpression} (${schedule.mode})`);
 }
 

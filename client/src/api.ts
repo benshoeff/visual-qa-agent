@@ -197,10 +197,11 @@ export interface RunStatus {
   createdAt: string
   updatedAt: string
   htmlUrl: string
+  projectId?: string
 }
 
-export async function getRunStatus(): Promise<RunStatus[]> {
-  const data = await request<{ runs: RunStatus[] }>('/api/status')
+export async function getRunStatus(projectId?: string): Promise<RunStatus[]> {
+  const data = await request<{ runs: RunStatus[] }>(`/api/status${projectParam(projectId)}`)
   return data.runs
 }
 

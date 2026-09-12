@@ -82,6 +82,23 @@ async function loadStatus(): Promise<Record<string, StatusEntry>> {
   return JSON.parse(file) as Record<string, StatusEntry>;
 }
 
+async function loadActiveProjectId(): Promise<string> {
+  const file = await getFileText("config.json");
+  if (!file) return "";
+  try {
+    const cfg = JSON.parse(file) as { activeProjectId?: unknown };
+    return typeof cfg.activeProjectId === "string" ? cfg.activeProjectId : "";
+  } catch {
+    return "";
+  }
+}
+
+// Status is stored per-project (`<projectId>::<name>`) so each project only ever
+// sees its own schedule run history. Legacy name-only entries act as a fallback.
+function statusKey(projectId: string, name: string): string {
+  return `${projectId || "__active__"}::${name}`;
+}
+
 // Read-only: schedules are defined only in schedules.yml. The UI just displays
 // the definitions plus the latest run facts recorded by the workflow.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -96,9 +113,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const [defs, statuses] = await Promise.all([loadSchedules(), loadStatus()]);
+    const [defs, statuses, activeId] = await Promise.all([
+      loadSchedules(),
+      loadStatus(),
+      loadActiveProjectId(),
+    ]);
     const result = defs.map((s) => {
-      const st = statuses[s.name] ?? {};
+      const projectId = s.projectId ?? activeId;
+      const st = statuses[statusKey(projectId, s.name)] ?? statuses[s.name] ?? {};
       return {
         name: s.name,
         cronExpression: s.cron,

@@ -6,12 +6,13 @@ export interface LocalRun {
   createdAt: string;
   updatedAt: string;
   htmlUrl: string | null;
+  projectId: string;
 }
 
 const runs: LocalRun[] = [];
 let nextId = 1;
 
-export function createLocalRun(mode: string): LocalRun {
+export function createLocalRun(mode: string, projectId: string): LocalRun {
   const now = new Date().toISOString();
   const run: LocalRun = {
     id: nextId,
@@ -21,10 +22,11 @@ export function createLocalRun(mode: string): LocalRun {
     createdAt: now,
     updatedAt: now,
     htmlUrl: null,
+    projectId,
   };
   nextId += 1;
   runs.unshift(run);
-  console.log(`\n🚀 LOCAL RUN #${run.runNumber} (${mode})`);
+  console.log(`\n🚀 LOCAL RUN #${run.runNumber} (${mode}) [${projectId}]`);
   return run;
 }
 
@@ -38,6 +40,6 @@ export function updateLocalRun(
   }
 }
 
-export function listLocalRuns(): LocalRun[] {
-  return [...runs];
+export function listLocalRuns(projectId?: string): LocalRun[] {
+  return projectId ? runs.filter((r) => r.projectId === projectId) : [...runs];
 }

@@ -540,7 +540,7 @@ router.post("/dispatch", async (req: Request, res: Response) => {
       res.status(404).json({ error: "Project not found" });
       return;
     }
-    const run = createLocalRun(mode);
+    const run = createLocalRun(mode, project.id);
     res.status(202).json({ success: true, message: `Dispatched ${mode} run` });
     void executeLocalRun(run.id, mode, project, body);
   } catch (err) {
@@ -548,9 +548,10 @@ router.post("/dispatch", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/status", (_req: Request, res: Response) => {
+router.get("/status", (req: Request, res: Response) => {
   try {
-    res.json({ runs: listLocalRuns() });
+    const projectId = req.query.project as string | undefined;
+    res.json({ runs: listLocalRuns(projectId) });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

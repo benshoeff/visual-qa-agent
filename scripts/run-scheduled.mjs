@@ -47,6 +47,30 @@ function isDue(expr, lastRunMs) {
   }
 }
 
+function readActiveProjectId() {
+  const cfgPath = path.join(root, "config.json");
+  if (!fs.existsSync(cfgPath)) return "";
+  try {
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf-8"));
+    return typeof cfg.activeProjectId === "string" ? cfg.activeProjectId : "";
+  } catch {
+    return "";
+  }
+}
+
+// A schedule without a projectId targets the config's active project at run time.
+function resolveScheduleProjectId(s) {
+  if (s.projectId) return String(s.projectId).trim();
+  return readActiveProjectId();
+}
+
+// Status is stored per-project (`<projectId>::<name>`) so schedule run history
+// is never shared between projects. Legacy name-only entries are read as a
+// fallback and cleaned up after a schedule runs with its new key.
+function statusKey(projectId, name) {
+  return `${projectId || "__active__"}::${name}`;
+}
+
 const status = loadStatus();
 const due = [];
 const today = new Date().toISOString();
@@ -56,13 +80,16 @@ for (const s of loadSchedules()) {
   const expr = String(s.cron ?? "").trim();
   if (!expr) continue;
 
-  const prev = status[s.name];
+  const projectId = resolveScheduleProjectId(s);
+  const key = statusKey(projectId, s.name);
+  const prev = status[key] ?? status[s.name];
   if (!isDue(expr, prev?.lastRun ?? null)) continue;
 
   due.push(s);
   const mode = s.mode === "baseline" ? "baseline" : "test";
-  console.log(`\n⏰ Scheduled "${s.name}" → ${s.mode}${s.projectId ? ` [${s.projectId}]` : ""} (${today})`);
-  const projectEnv = s.projectId ? `PROJECT=${JSON.stringify(s.projectId)} ` : "";
+  const label = s.projectId ? `[${s.projectId}]` : `[active:${projectId || "none"}]`;
+  console.log(`\n⏰ Scheduled "${s.name}" → ${s.mode} ${label} (${today})`);
+  const projectEnv = projectId ? `PROJECT=${JSON.stringify(projectId)} ` : "";
   let ok = true;
   try {
     execSync(`${projectEnv}npm run ${mode}`, { stdio: "inherit" });
@@ -70,11 +97,12 @@ for (const s of loadSchedules()) {
     ok = false;
     console.error(`   ❌ "${s.name}" failed: ${err instanceof Error ? err.message : err}`);
   }
-  status[s.name] = {
+  status[key] = {
     lastRun: Date.now(),
     status: ok ? "pass" : "fail",
-    ...(s.projectId ? { projectId: s.projectId } : {}),
+    projectId,
   };
+  if (key !== s.name) delete status[s.name];
 }
 
 if (due.length) {

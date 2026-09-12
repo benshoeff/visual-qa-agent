@@ -64,7 +64,7 @@ export default function TestRunner() {
   useEffect(() => {
     if (!projectId) return
     getPages(projectId).then(setPages).catch(() => {})
-    getRunStatus().then((runs) => setRunStatus(runs[0] ?? null)).catch(() => {})
+    getRunStatus(projectId).then((runs) => setRunStatus(runs[0] ?? null)).catch(() => {})
     Promise.resolve().then(loadSummary)
   }, [projectId])
 
@@ -85,7 +85,7 @@ export default function TestRunner() {
     stopPolling()
     polling.current = setInterval(async () => {
       try {
-        const runs = await getRunStatus()
+        const runs = await getRunStatus(projectId)
         const latest = runs[0] ?? null
         setRunStatus(latest)
         if (latest && !isRunPending(latest)) {
