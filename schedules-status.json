@@ -8,13 +8,13 @@
     "status": "fail",
     "projectId": "my-site"
   },
-  "test": {
-    "lastRun": 1789208263146,
-    "status": "fail",
+  "my-site::test": {
+    "lastRun": 1789221355272,
+    "status": "pass",
     "projectId": "my-site"
   },
-  "בדיקה": {
-    "lastRun": 1789208493498,
+  "default::בדיקה": {
+    "lastRun": 1789221564031,
     "status": "pass",
     "projectId": "default"
   }
