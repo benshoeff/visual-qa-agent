@@ -1,0 +1,41 @@
+{
+  "pageName": "permissions",
+  "regions": [
+    {
+      "y": 26,
+      "height": 52
+    },
+    {
+      "y": 115,
+      "height": 14
+    },
+    {
+      "y": 160,
+      "height": 98
+    },
+    {
+      "y": 288,
+      "height": 102
+    },
+    {
+      "y": 414,
+      "height": 65
+    },
+    {
+      "y": 511,
+      "height": 12
+    },
+    {
+      "y": 555,
+      "height": 11
+    },
+    {
+      "y": 599,
+      "height": 11
+    },
+    {
+      "y": 643,
+      "height": 48
+    }
+  ]
+}

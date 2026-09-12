@@ -1,0 +1,33 @@
+{
+  "pageName": "homepage",
+  "regions": [
+    {
+      "y": 26,
+      "height": 52
+    },
+    {
+      "y": 115,
+      "height": 99
+    },
+    {
+      "y": 246,
+      "height": 56
+    },
+    {
+      "y": 335,
+      "height": 99
+    },
+    {
+      "y": 467,
+      "height": 56
+    },
+    {
+      "y": 555,
+      "height": 11
+    },
+    {
+      "y": 599,
+      "height": 120
+    }
+  ]
+}
