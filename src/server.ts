@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import { router } from "./routes.js";
 import { BASELINES_DIR, CURRENT_DIR, DIFFS_DIR } from "./config.js";
-import { initScheduler } from "./scheduler.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -36,8 +35,6 @@ app.get("*", (req, res) => {
     res.sendFile(path.join(CLIENT_DIST, "index.html"));
   }
 });
-
-initScheduler();
 
 app.listen(PORT, () => {
   console.log(`\n🌐 Visual QA running on port ${PORT}`);
