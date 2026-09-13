@@ -9,12 +9,12 @@
     "projectId": "my-site"
   },
   "my-site::test": {
-    "lastRun": 1789257051943,
+    "lastRun": 1789271003379,
     "status": "pass",
     "projectId": "my-site"
   },
   "default::בדיקה": {
-    "lastRun": 1789257276952,
+    "lastRun": 1789271227767,
     "status": "pass",
     "projectId": "default"
   }
