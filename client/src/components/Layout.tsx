@@ -95,7 +95,7 @@ function Brand() {
 }
 
 function ProjectSwitcher() {
-  const { config, project, loading, switchProject } = useProject()
+  const { config, project, loading, switching, switchProject } = useProject()
 
   if (loading || !config || config.projects.length === 0) {
     return (
@@ -111,8 +111,9 @@ function ProjectSwitcher() {
   return (
     <div className="px-4 pb-2">
       <Select value={project?.id ?? ''} onValueChange={(v) => void switchProject(v)}>
-        <SelectTrigger className="h-9 w-full text-xs" aria-label="Active project">
+        <SelectTrigger className="h-9 w-full gap-2 text-xs" aria-label="Active project">
           <SelectValue placeholder="Select project" />
+          {switching && <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />}
         </SelectTrigger>
         <SelectContent>
           {config.projects.map((p) => (
@@ -165,6 +166,7 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { project } = useProject()
 
   return (
     <div className="flex min-h-screen">
@@ -208,7 +210,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 md:px-8 md:py-8">
-          {children}
+          <div key={project?.id ?? 'no-project'} className="project-enter">
+            {children}
+          </div>
         </main>
       </div>
     </div>

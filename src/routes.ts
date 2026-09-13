@@ -60,7 +60,7 @@ router.post("/projects", (req: Request, res: Response) => {
       }
       config.activeProjectId = config.projects[idx].id;
       writeConfig(config);
-      res.json({ activeProjectId: config.activeProjectId });
+      res.json(config);
       return;
     }
 
@@ -187,7 +187,7 @@ router.post("/projects/:id/activate", (req: Request, res: Response) => {
     }
     config.activeProjectId = req.params.id as string;
     writeConfig(config);
-    res.json({ activeProjectId: config.activeProjectId });
+    res.json(config);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

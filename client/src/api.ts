@@ -3,6 +3,7 @@ const BASE = ''
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
     headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
     ...options,
   })
   if (!res.ok) {
@@ -13,7 +14,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 async function requestText(url: string): Promise<string> {
-  const res = await fetch(`${BASE}${url}`)
+  const res = await fetch(`${BASE}${url}`, { cache: 'no-store' })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(err.error || 'Request failed')
@@ -138,8 +139,8 @@ export async function deleteProject(id: string): Promise<void> {
   await request(`/api/projects?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
-export async function activateProject(id: string): Promise<{ activeProjectId: string }> {
-  return request(`/api/projects?id=${encodeURIComponent(id)}&confirm=true`, { method: 'POST' })
+export async function activateProject(id: string): Promise<Config> {
+  return request<Config>(`/api/projects?id=${encodeURIComponent(id)}&confirm=true`, { method: 'POST' })
 }
 
 export async function getPages(projectId?: string): Promise<PageConfig[]> {

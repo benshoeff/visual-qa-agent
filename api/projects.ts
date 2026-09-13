@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       config.activeProjectId = project.id;
       await saveConfig(config, `Activate project ${project.name} via UI`);
-      res.status(200).setHeaders(corsHeaders()).json({ activeProjectId: config.activeProjectId });
+      res.status(200).setHeaders(corsHeaders()).json(config);
       return;
     }
 
