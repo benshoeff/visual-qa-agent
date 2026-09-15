@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Clock, Info } from 'lucide-react'
+import { Clock, Info, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
-import { getSchedules, type Schedule } from '../api'
+import { getSchedules, getReportUrl, type Schedule } from '../api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useProject } from '@/contexts/ProjectContext'
@@ -14,6 +14,25 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
+function formatCronHuman(cron: string): string {
+  const parts = cron.split(' ')
+  if (parts.length < 5) return cron
+  const [minute, hour, , , dayOfWeek] = parts
+  const time = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')} UTC`
+  const dayMap: Record<string, string> = {
+    '*': 'daily',
+    '1': 'every Monday',
+    '2': 'every Tuesday',
+    '3': 'every Wednesday',
+    '4': 'every Thursday',
+    '5': 'every Friday',
+    '6': 'every Saturday',
+    '0': 'every Sunday',
+    '1-5': 'weekdays',
+  }
+  return `${time} ${dayMap[dayOfWeek] ?? dayOfWeek}`
+}
+
 function formatLastRun(ts: number): string {
   const diff = Date.now() - ts
   const minutes = Math.floor(diff / 60000)
@@ -22,6 +41,17 @@ function formatLastRun(ts: number): string {
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${hours}h ago`
   return `${Math.floor(hours / 24)}d ago`
+}
+
+function formatLastRunDate(ts: number): string {
+  return new Date(ts).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
 }
 
 export default function ScheduleManager() {
@@ -74,9 +104,9 @@ export default function ScheduleManager() {
                 <TableHead>Name</TableHead>
                 <TableHead>Time (UTC)</TableHead>
                 <TableHead>Project</TableHead>
-                <TableHead>Mode</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Last Run</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -87,16 +117,12 @@ export default function ScheduleManager() {
                   </TableCell>
                   <TableCell>
                     <code className="rounded bg-muted px-2 py-0.5 text-xs">{s.cronExpression}</code>
+                    <span className="ml-2 text-xs text-muted-foreground">{formatCronHuman(s.cronExpression)}</span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {s.projectId
                       ? (config?.projects.find((p) => p.id === s.projectId)?.name ?? s.projectId)
                       : 'Active project'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="capitalize">
-                      {s.mode}
-                    </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
@@ -116,12 +142,30 @@ export default function ScheduleManager() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {s.lastRun ? (
-                      <span title={new Date(s.lastRun).toLocaleString('en-US')}>
-                        {formatLastRun(s.lastRun)}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-sm" title={formatLastRunDate(s.lastRun)}>
+                          {formatLastRun(s.lastRun)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatLastRunDate(s.lastRun)}
+                        </span>
+                      </div>
                     ) : (
                       'Never'
                     )}
+                  </TableCell>
+                  <TableCell>
+                    {s.lastRun && s.status !== 'pending' ? (
+                      <a
+                        href={getReportUrl(`report-${s.lastRun}.html`, s.projectId)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                      >
+                        <ExternalLink className="size-3" />
+                        Report
+                      </a>
+                    ) : null}
                   </TableCell>
                 </TableRow>
               ))}
