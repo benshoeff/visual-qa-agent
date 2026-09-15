@@ -464,7 +464,8 @@ export async function runTest(config: Config, project: ProjectConfig, pageNames?
   console.log(`\n${"─".repeat(40)}`);
   console.log(`סיכום: ${passed} עברו ✅  |  ${failed} נכשלו ❌`);
 
-  const outReportPath = reportPath(project.id);
+  const timestamp = process.env.REPORT_TIMESTAMP ? Number(process.env.REPORT_TIMESTAMP) : undefined;
+  const outReportPath = reportPath(project.id, timestamp && Number.isFinite(timestamp) ? timestamp : undefined);
   generateReport(results, outReportPath);
 
   return results;

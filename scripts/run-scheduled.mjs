@@ -89,18 +89,22 @@ for (const s of loadSchedules()) {
   const mode = s.mode === "baseline" ? "baseline" : "test";
   const label = s.projectId ? `[${s.projectId}]` : `[active:${projectId || "none"}]`;
   console.log(`\n⏰ Scheduled "${s.name}" → ${s.mode} ${label} (${today})`);
+  const stamp = Date.now();
   const projectEnv = projectId ? `PROJECT=${JSON.stringify(projectId)} ` : "";
   let ok = true;
   try {
-    execSync(`${projectEnv}npm run ${mode}`, { stdio: "inherit" });
+    execSync(`${projectEnv}REPORT_TIMESTAMP=${stamp} npm run ${mode}`, { stdio: "inherit" });
   } catch (err) {
     ok = false;
     console.error(`   ❌ "${s.name}" failed: ${err instanceof Error ? err.message : err}`);
   }
   status[key] = {
-    lastRun: Date.now(),
+    lastRun: stamp,
     status: ok ? "pass" : "fail",
     projectId,
+    ...(ok && fs.existsSync(path.join(root, "reports", projectId, `report-${stamp}.html`))
+      ? { reportFile: `report-${stamp}.html` }
+      : {}),
   };
   if (key !== s.name) delete status[s.name];
 }

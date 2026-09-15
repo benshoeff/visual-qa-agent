@@ -155,9 +155,9 @@ export default function ScheduleManager() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {s.lastRun && s.status !== 'pending' ? (
+                    {s.reportFile ? (
                       <a
-                        href={getReportUrl(`report-${s.lastRun}.html`, s.projectId)}
+                        href={getReportUrl(s.reportFile, s.projectId)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"

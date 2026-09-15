@@ -264,6 +264,7 @@ export interface Schedule {
   projectId?: string
   lastRun: number | null
   status: 'pending' | 'pass' | 'fail'
+  reportFile: string | null
 }
 
 export async function getSchedules(): Promise<Schedule[]> {

@@ -13,6 +13,7 @@ export interface Schedule {
   projectId?: string;
   lastRun: number | null;
   status: "pending" | "pass" | "fail";
+  reportFile: string | null;
 }
 
 const SCHEDULES_PATH = path.join(process.cwd(), "schedules.yml");
@@ -26,7 +27,7 @@ interface ScheduleDef {
   projectId?: string;
 }
 
-function readStatus(): Record<string, { lastRun?: number; status?: string }> {
+function readStatus(): Record<string, { lastRun?: number; status?: string; reportFile?: string }> {
   if (!fs.existsSync(STATUS_PATH)) return {};
   try {
     return JSON.parse(fs.readFileSync(STATUS_PATH, "utf-8"));
@@ -65,6 +66,7 @@ function readSchedules(): Schedule[] {
       ...(s.projectId ? { projectId: s.projectId } : {}),
       lastRun: st.lastRun ?? null,
       status: normalizeStatus(st.status),
+      reportFile: typeof st.reportFile === "string" ? st.reportFile : null,
     };
   });
 }

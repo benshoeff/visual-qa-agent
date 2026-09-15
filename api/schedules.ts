@@ -67,6 +67,7 @@ interface StatusEntry {
   lastRun?: number;
   status?: "pass" | "fail";
   projectId?: string;
+  reportFile?: string;
 }
 
 async function loadSchedules(): Promise<ScheduleDef[]> {
@@ -129,6 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ...(s.projectId ? { projectId: s.projectId } : {}),
         lastRun: st.lastRun ?? null,
         status: st.status ?? "pending",
+        reportFile: st.reportFile ?? null,
       };
     });
     res.status(200).setHeaders(corsHeaders()).json(result);
