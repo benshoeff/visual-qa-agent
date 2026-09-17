@@ -107,6 +107,7 @@ export default function RunHistory() {
         await Promise.all(
           Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker())
         )
+        parsed.sort((a, b) => b.file.timestamp - a.file.timestamp)
         if (!cancelled) setRuns(parsed)
       })
       .catch(() => {

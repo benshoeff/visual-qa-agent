@@ -19,9 +19,9 @@ jobs:
 
       - name: Remove temporary/generated files
         run: |
-          rm -f reports/*.html || true
-          rm -f current/*.png || true
-          rm -f diffs/*.png || true
+          rm -f reports/*/*.html || true
+          rm -f current/*/*.png || true
+          rm -f diffs/*/*.png || true
           rm -f crawl-results/*.json || true
           rm -f crawl-jobs/*.json || true
 
