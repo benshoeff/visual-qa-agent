@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "activeProjectId": "my-site",
+  "activeProjectId": "default",
   "projects": [
     {
       "id": "default",
