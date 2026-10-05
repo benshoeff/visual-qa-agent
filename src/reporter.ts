@@ -1,10 +1,22 @@
 import fs from "fs";
 import path from "path";
 import { CompareResult } from "./compare.js";
+import type {
+  A11yAnalysisResult,
+  A11yComparisonResult,
+} from "./a11y/index.js";
+import type {
+  PerformanceAnalysisResult,
+  PerformanceComparisonResult,
+} from "./performance/index.js";
 
 export interface EnhancedCompareResult extends CompareResult {
   aiAnalysis?: VisionAnalysis;
   aiMetadata?: AIAnalysisMetadata;
+  a11y?: A11yAnalysisResult;
+  a11yComparison?: A11yComparisonResult | null;
+  performance?: PerformanceAnalysisResult;
+  performanceComparison?: PerformanceComparisonResult | null;
 }
 
 export interface VisionAnalysis {
@@ -34,6 +46,118 @@ export interface AIAnalysisMetadata {
   fallbackUsed: boolean;
   fallbackReason?: string;
   tokensUsed?: number;
+}
+
+/**
+ * Structured payload embedded in the report as a JSON island so the dashboard can
+ * read the full result set without scraping the HTML table. Bump the version when
+ * the shape changes — clients fall back to HTML scraping on mismatch.
+ */
+export const QA_DATA_VERSION = 1;
+
+export interface QADataIsland {
+  version: number;
+  generatedAt: number;
+  summary: { total: number; passed: number; failed: number };
+  results: unknown[];
+}
+
+function buildDataIsland(
+  results: EnhancedCompareResult[],
+  generatedAt: number
+): QADataIsland {
+  return {
+    version: QA_DATA_VERSION,
+    generatedAt,
+    summary: {
+      total: results.length,
+      passed: results.filter((r) => r.passed).length,
+      failed: results.filter((r) => !r.passed).length,
+    },
+    results: results.map((r) => ({
+      pageName: r.pageName,
+      passed: r.passed,
+      diffPercent: r.diffPercent,
+      diffPixels: r.diffPixels,
+      totalPixels: r.totalPixels,
+      error: r.error ?? null,
+      hasDiff: !!r.diffPath,
+      aiAnalysis: r.aiAnalysis ?? null,
+      aiMetadata: r.aiMetadata ?? null,
+      a11y: r.a11y
+        ? {
+            violations: r.a11y.violations.map((v) => ({
+              id: v.id,
+              impact: v.impact,
+              description: v.description,
+              help: v.help,
+              helpUrl: v.helpUrl,
+              nodeCount: v.nodes?.length ?? 0,
+            })),
+            passes: r.a11y.passes,
+            incomplete: r.a11y.incomplete,
+            inapplicable: r.a11y.inapplicable,
+          }
+        : null,
+      a11yComparison: r.a11yComparison
+        ? {
+            newViolations: r.a11yComparison.newViolations.map((v) => ({
+              id: v.id,
+              impact: v.impact,
+              help: v.help,
+              helpUrl: v.helpUrl,
+            })),
+            fixedViolations: r.a11yComparison.fixedViolations.length,
+            persistentViolations: r.a11yComparison.persistentViolations.length,
+            regressionScore: r.a11yComparison.regressionScore,
+            summary: r.a11yComparison.summary,
+          }
+        : null,
+      performance: r.performance
+        ? {
+            coreWebVitals: r.performance.lighthouse?.coreWebVitals ?? null,
+            performanceScore: r.performance.lighthouse?.performance ?? null,
+            accessibilityScore: r.performance.lighthouse?.accessibility ?? null,
+            passed: r.performance.passed,
+            budgetViolations: r.performance.budgetViolations,
+          }
+        : null,
+      performanceComparison: r.performanceComparison
+        ? {
+            current: r.performanceComparison.current,
+            baseline: r.performanceComparison.baseline,
+            regressions: r.performanceComparison.regressions,
+          }
+        : null,
+    })),
+  };
+}
+
+/** Escapes a string for safe embedding inside a <script> block. */
+function jsonForScript(data: QADataIsland): string {
+  const json = JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
+  // U+2028 and U+2029 are legal in JSON but are line terminators in JS
+  // source, so they must not appear raw inside a script block.
+  return json
+    .split(String.fromCharCode(0x2028)).join("\\u2028")
+    .split(String.fromCharCode(0x2029)).join("\\u2029");
+}
+
+/**
+ * Escapes text for interpolation into the report HTML body. Page names come
+ * from crawler discovery, and reasoning/suggestions come from the model, so
+ * every such value is untrusted.
+ */
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export function generateReport(
@@ -79,7 +203,7 @@ export function generateReport(
       const diffImg = r.diffPath ? toBase64(r.diffPath) : "";
 
       const errorRow = r.error
-        ? `<tr><td colspan="5" class="error-msg">⚠️ ${r.error}</td></tr>`
+        ? `<tr><td colspan="5" class="error-msg">⚠️ ${escapeHtml(r.error)}</td></tr>`
         : "";
 
       // AI Analysis section
@@ -96,14 +220,14 @@ export function generateReport(
               </span>
               <span class="ai-confidence">Confidence: ${(r.aiAnalysis.confidence * 100).toFixed(0)}%</span>
             </div>
-            <div class="ai-reasoning">${r.aiAnalysis.reasoning}</div>
+            <div class="ai-reasoning">${escapeHtml(r.aiAnalysis.reasoning)}</div>
             ${
               r.aiAnalysis.suggestions.length > 0
                 ? `
               <div class="ai-suggestions">
                 <strong>💡 Suggestions:</strong>
                 <ul>
-                  ${r.aiAnalysis.suggestions.map((s) => `<li>${s}</li>`).join("")}
+                  ${r.aiAnalysis.suggestions.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}
                 </ul>
               </div>
             `
@@ -128,10 +252,10 @@ export function generateReport(
                       .map(
                         (el) => `
                       <tr>
-                        <td><code>${el.selector}</code></td>
-                        <td><span class="change-type ${el.changeType}">${el.changeType}</span></td>
-                        <td><span class="impact ${el.impact}">${el.impact}</span></td>
-                        <td>${el.description}</td>
+                        <td><code>${escapeHtml(el.selector)}</code></td>
+                        <td><span class="change-type ${escapeHtml(el.changeType)}">${escapeHtml(el.changeType)}</span></td>
+                        <td><span class="impact ${escapeHtml(el.impact)}">${escapeHtml(el.impact)}</span></td>
+                        <td>${escapeHtml(el.description)}</td>
                       </tr>
                     `
                       )
@@ -151,7 +275,7 @@ export function generateReport(
                   ${r.aiAnalysis.accessibilityIssues
                     .map(
                       (issue) => `
-                    <li><span class="severity ${issue.severity}">${issue.severity.toUpperCase()}</span> ${issue.rule} - ${issue.element}: ${issue.description}</li>
+                    <li><span class="severity ${escapeHtml(issue.severity)}">${escapeHtml(issue.severity.toUpperCase())}</span> ${escapeHtml(issue.rule)} - ${escapeHtml(issue.element)}: ${escapeHtml(issue.description)}</li>
                   `
                     )
                     .join("")}
@@ -161,7 +285,7 @@ export function generateReport(
                 : ""
             }
             <div class="ai-metadata">
-              <small>Model: ${r.aiMetadata?.model ?? "N/A"} | Latency: ${r.aiMetadata?.latencyMs ?? 0}ms${r.aiMetadata?.fallbackUsed ? " | ⚠️ Fallback used: " + r.aiMetadata.fallbackReason : ""}</small>
+              <small>Model: ${escapeHtml(r.aiMetadata?.model ?? "N/A")} | Latency: ${escapeHtml(r.aiMetadata?.latencyMs ?? 0)}ms${r.aiMetadata?.fallbackUsed ? " | ⚠️ Fallback used: " + escapeHtml(r.aiMetadata.fallbackReason) : ""}</small>
             </div>
           </div>
         </td>
@@ -171,11 +295,11 @@ export function generateReport(
 
       return `
       <tr class="${statusClass}-row">
-        <td><strong>${r.pageName}</strong></td>
+        <td><strong>${escapeHtml(r.pageName)}</strong></td>
         <td class="${statusClass}">${statusText}</td>
-        <td>${r.diffPercent}%</td>
-        <td>${r.diffPixels.toLocaleString()} px</td>
-        <td>${r.aiAnalysis ? `<span class="ai-badge" style="background: ${getClassificationColor(r.aiAnalysis.classification)}">${getClassificationIcon(r.aiAnalysis.classification)} ${r.aiAnalysis.classification}</span>` : "—"}</td>
+        <td>${escapeHtml(r.diffPercent)}%</td>
+        <td>${escapeHtml(r.diffPixels.toLocaleString())} px</td>
+        <td>${r.aiAnalysis ? `<span class="ai-badge" style="background: ${getClassificationColor(r.aiAnalysis.classification)}">${getClassificationIcon(r.aiAnalysis.classification)} ${escapeHtml(r.aiAnalysis.classification)}</span>` : "—"}</td>
       </tr>
       ${errorRow}
       ${
@@ -206,6 +330,8 @@ export function generateReport(
     `;
     })
     .join("");
+
+  const dataIsland = jsonForScript(buildDataIsland(results, generatedAt));
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -473,6 +599,8 @@ export function generateReport(
     </tbody>
   </table>
   </div>
+
+  <script type="application/json" id="qa-data">${dataIsland}</script>
 
   <script>
     (function () {

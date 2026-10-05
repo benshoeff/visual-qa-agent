@@ -4,5 +4,6 @@ export type {
   LighthouseBudget, 
   BudgetCheckResult, 
   PerformanceTrend,
-  PerformanceComparisonResult 
+  PerformanceComparisonResult,
+  PerformanceAnalysisResult 
 } from "./analyzer.js";

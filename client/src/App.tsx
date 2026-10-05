@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ProjectProvider } from './contexts/ProjectContext'
-import Dashboard from './components/Dashboard'
+import Home from './components/Home'
 import PagesManager from './components/PagesManager'
 import CrawlManager from './components/CrawlManager'
 import TestRunner from './components/TestRunner'
@@ -19,7 +19,7 @@ export default function App() {
         <Layout>
           <ErrorBoundary>
             <Routes>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/" element={<Home />} />
               <Route path="/pages" element={<PagesManager />} />
               <Route path="/crawl" element={<CrawlManager />} />
               <Route path="/runner" element={<TestRunner />} />

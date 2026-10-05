@@ -39,7 +39,7 @@ import {
 } from '@/components/ui/select'
 
 const links = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/', label: 'Home', icon: LayoutDashboard },
   { to: '/pages', label: 'Pages', icon: FileText },
   { to: '/crawl', label: 'Site Crawler', icon: ScanSearch },
   { to: '/runner', label: 'Test Runner', icon: Play },
@@ -87,7 +87,7 @@ function Brand() {
       <div className="flex flex-col leading-tight">
         <span className="text-sm font-semibold text-foreground">Visual QA</span>
         <span className="text-[11px] uppercase tracking-widest text-muted-foreground">
-          Dashboard
+          Home
         </span>
       </div>
     </div>
