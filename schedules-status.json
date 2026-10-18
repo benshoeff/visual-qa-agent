@@ -1,14 +1,14 @@
 {
   "default::Nightly run": {
-    "lastRun": 1792236474044,
+    "lastRun": 1792328607453,
     "status": "pass",
     "projectId": "default",
-    "reportFile": "report-1792236474044.html"
+    "reportFile": "report-1792328607453.html"
   },
   "my-site::Nightly run website": {
-    "lastRun": 1792236697879,
+    "lastRun": 1792328835887,
     "status": "pass",
     "projectId": "my-site",
-    "reportFile": "report-1792236697879.html"
+    "reportFile": "report-1792328835887.html"
   }
 }
